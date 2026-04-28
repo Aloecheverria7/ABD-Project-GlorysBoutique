@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.env
+.logs/
+installers/
+.DS_Store
+npm-debug.log*
+database/
+
+server/.env
