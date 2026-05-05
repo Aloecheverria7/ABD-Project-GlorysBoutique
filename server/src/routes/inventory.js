@@ -1,8 +1,11 @@
 import { Router } from 'express';
 import { Inventario, Producto, ProductoVariante } from '../models/index.js';
+import { requireAuth, requireRole } from '../auth/middleware.js';
 import { asyncHandler } from '../utils/http.js';
 
 export const inventoryRouter = Router();
+
+inventoryRouter.use(requireAuth);
 
 function formatInventory(item) {
   const data = item.get({ plain: true });
@@ -34,7 +37,7 @@ inventoryRouter.get('/', asyncHandler(async (_req, res) => {
   res.json(inventory.map(formatInventory));
 }));
 
-inventoryRouter.put('/:variantId', asyncHandler(async (req, res) => {
+inventoryRouter.put('/:variantId', requireRole('admin'), asyncHandler(async (req, res) => {
   const cantidad = Number(req.body.cantidad || 0);
   const [item] = await Inventario.findOrCreate({
     where: { producto_variante_id: req.params.variantId },

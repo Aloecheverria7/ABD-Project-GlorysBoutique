@@ -1,8 +1,11 @@
 import { Router } from 'express';
 import { Cliente, TipoCliente } from '../models/index.js';
+import { requireAuth, requireRole } from '../auth/middleware.js';
 import { asyncHandler, sendCreated } from '../utils/http.js';
 
 export const customersRouter = Router();
+
+customersRouter.use(requireAuth);
 
 function formatCustomer(customer) {
   const data = customer.get({ plain: true });
@@ -50,7 +53,7 @@ customersRouter.put('/:id', asyncHandler(async (req, res) => {
   res.json(customer);
 }));
 
-customersRouter.delete('/:id', asyncHandler(async (req, res) => {
+customersRouter.delete('/:id', requireRole('admin'), asyncHandler(async (req, res) => {
   const deleted = await Cliente.destroy({ where: { id: req.params.id } });
   if (!deleted) {
     res.status(404).json({ message: 'Cliente no encontrado.' });

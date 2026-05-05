@@ -50,7 +50,8 @@ export const Producto = sequelize.define('Producto', {
   id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
   nombre: { type: DataTypes.STRING(150), allowNull: false },
   descripcion: DataTypes.TEXT,
-  precio_base: { type: DataTypes.DECIMAL(10, 2), allowNull: false, defaultValue: 0 },
+  precio_base: { type: DataTypes.DECIMAL(10, 2), allowNull: true },
+  precio_usd: { type: DataTypes.DECIMAL(10, 2), allowNull: true },
   categoria_id: DataTypes.INTEGER,
   subcategoria_id: DataTypes.INTEGER,
   proveedor_id: DataTypes.INTEGER
@@ -77,11 +78,20 @@ export const TipoPago = sequelize.define('TipoPago', {
 export const Venta = sequelize.define('Venta', {
   id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
   cliente_id: DataTypes.INTEGER,
+  cliente_nombre: DataTypes.STRING(150),
   usuario_id: DataTypes.INTEGER,
   tipo_pago_id: DataTypes.INTEGER,
   total: { type: DataTypes.DECIMAL(10, 2), allowNull: false, defaultValue: 0 },
+  moneda: { type: DataTypes.STRING(3), allowNull: false, defaultValue: 'NIO' },
+  tasa_cambio: DataTypes.DECIMAL(10, 4),
   fecha: { type: DataTypes.DATE, defaultValue: DataTypes.NOW }
 }, { tableName: 'ventas', timestamps: false });
+
+export const Configuracion = sequelize.define('Configuracion', {
+  id: { type: DataTypes.INTEGER, primaryKey: true },
+  tasa_cambio_usd: { type: DataTypes.DECIMAL(10, 4), allowNull: false, defaultValue: 36.62 },
+  updated_at: { type: DataTypes.DATE, defaultValue: DataTypes.NOW }
+}, { tableName: 'configuracion', timestamps: false });
 
 export const DetalleVenta = sequelize.define('DetalleVenta', {
   id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
@@ -133,6 +143,7 @@ DetalleVenta.belongsTo(ProductoVariante, { foreignKey: 'producto_variante_id', a
 export const models = {
   Categoria,
   Cliente,
+  Configuracion,
   DetalleVenta,
   Inventario,
   Producto,
