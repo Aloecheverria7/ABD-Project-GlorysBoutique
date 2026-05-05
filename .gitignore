@@ -5,7 +5,6 @@ dist/
 installers/
 .DS_Store
 npm-debug.log*
-database/
 
 server/.env
 
