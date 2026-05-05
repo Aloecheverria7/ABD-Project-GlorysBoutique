@@ -1,8 +1,11 @@
 import { Router } from 'express';
 import { Categoria, Proveedor, Subcategoria, TipoCliente, TipoPago, Usuario } from '../models/index.js';
+import { requireAuth, requireRole } from '../auth/middleware.js';
 import { asyncHandler, sendCreated } from '../utils/http.js';
 
 export const catalogRouter = Router();
+
+catalogRouter.use(requireAuth);
 
 catalogRouter.get('/lookups', asyncHandler(async (_req, res) => {
   const [categorias, subcategorias, proveedores, tiposCliente, tiposPago, usuarios] = await Promise.all([
@@ -24,7 +27,7 @@ catalogRouter.get('/proveedores', asyncHandler(async (_req, res) => {
   res.json(await Proveedor.findAll({ order: [['nombre', 'ASC']] }));
 }));
 
-catalogRouter.post('/proveedores', asyncHandler(async (req, res) => {
+catalogRouter.post('/proveedores', requireRole('admin'), asyncHandler(async (req, res) => {
   const { nombre, telefono, direccion } = req.body;
   const proveedor = await Proveedor.create({
     nombre,
@@ -38,7 +41,7 @@ catalogRouter.get('/categorias', asyncHandler(async (_req, res) => {
   res.json(await Categoria.findAll({ order: [['nombre', 'ASC']] }));
 }));
 
-catalogRouter.post('/categorias', asyncHandler(async (req, res) => {
+catalogRouter.post('/categorias', requireRole('admin'), asyncHandler(async (req, res) => {
   const categoria = await Categoria.create({ nombre: req.body.nombre });
   sendCreated(res, categoria);
 }));
