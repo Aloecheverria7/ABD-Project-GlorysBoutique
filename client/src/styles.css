@@ -69,6 +69,34 @@ button:disabled {
   flex: 0 0 auto;
 }
 
+.logo-img {
+  border-radius: 8px;
+  flex: 0 0 auto;
+  object-fit: contain;
+}
+
+.logo-placeholder {
+  align-items: center;
+  border: 1px dashed currentColor;
+  border-radius: 8px;
+  display: inline-flex;
+  flex: 0 0 auto;
+  font-size: 0.6rem;
+  font-weight: 800;
+  justify-content: center;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.logo-placeholder--light {
+  color: #f3b6bc;
+}
+
+.logo-placeholder--dark {
+  background: #f8fafc;
+  color: #b14f5a;
+}
+
 .sidebar-brand span {
   color: #f3b6bc;
   font-size: 0.72rem;

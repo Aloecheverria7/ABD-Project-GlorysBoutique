@@ -14,7 +14,6 @@ import {
   Settings,
   ShoppingBag,
   ShoppingCart,
-  Store,
   Trash2,
   Users
 } from 'lucide-react';
@@ -132,6 +131,7 @@ function buildReceiptHTML(sale) {
 
   const fecha = sale.fecha ? new Date(sale.fecha).toLocaleString() : new Date().toLocaleString();
   const equivalencia = `Equivalente: ${fmt(totalAlt, altCurrency)} (Tasa C$${rate.toFixed(4)} = US$1)`;
+  const logoUrl = `${window.location.origin}/logo.png`;
 
   return `<!DOCTYPE html>
 <html lang="es">
@@ -150,6 +150,19 @@ function buildReceiptHTML(sale) {
     color: #000;
   }
   h1 { font-size: 14px; margin: 0 0 2px; text-align: center; }
+  .logo { display: block; margin: 0 auto 4px; max-height: 56px; max-width: 60mm; }
+  .logo-fallback {
+    border: 1px dashed #000;
+    color: #000;
+    display: block;
+    font-size: 10px;
+    font-weight: bold;
+    letter-spacing: 0.1em;
+    margin: 0 auto 4px;
+    padding: 6px 12px;
+    text-align: center;
+    width: max-content;
+  }
   .muted { color: #444; font-size: 10px; }
   .center { text-align: center; }
   .row { display: flex; justify-content: space-between; gap: 6px; }
@@ -164,6 +177,7 @@ function buildReceiptHTML(sale) {
 </style>
 </head>
 <body>
+  <img src="${escapeHTML(logoUrl)}" alt="Logo" class="logo" onerror="this.outerHTML='&lt;span class=&quot;logo-fallback&quot;&gt;LOGO&lt;/span&gt;'">
   <h1>Glory's Boutique</h1>
   <p class="center muted">Recibo de venta</p>
   <div class="line"></div>
@@ -299,6 +313,30 @@ function useBootstrap(user) {
   return { ...state, reload: load, updateConfig };
 }
 
+function Logo({ size = 40, variant = 'light' }) {
+  const [failed, setFailed] = useState(false);
+  if (failed) {
+    return (
+      <div
+        className={`logo-placeholder logo-placeholder--${variant}`}
+        style={{ width: size, height: size }}
+        aria-label="Logo"
+      >
+        LOGO
+      </div>
+    );
+  }
+  return (
+    <img
+      src="/logo.png"
+      alt="Logo"
+      className="logo-img"
+      style={{ width: size, height: size }}
+      onError={() => setFailed(true)}
+    />
+  );
+}
+
 function Field({ label, children }) {
   return (
     <label className="field">
@@ -342,7 +380,7 @@ function LoginScreen({ onLogin }) {
     <div className="login-shell">
       <form className="login-card" onSubmit={submit}>
         <div className="login-brand">
-          <Store size={28} />
+          <Logo size={48} variant="dark" />
           <div>
             <span>Glory's Boutique</span>
             <strong>Iniciar sesion</strong>
@@ -1160,7 +1198,7 @@ function Sidebar({ activeView, onSelect, open, onClose, user, onLogout }) {
   return (
     <aside className={`sidebar${open ? ' sidebar--open' : ''}`}>
       <div className="sidebar-brand">
-        <Store size={22} />
+        <Logo size={40} variant="light" />
         <div>
           <span>Glory's</span>
           <strong>Boutique</strong>
@@ -1265,6 +1303,7 @@ function Workspace({ user, onLogout }) {
               <span />
               <span />
             </button>
+            <Logo size={36} variant="dark" />
             <div>
               <p>Glory's Boutique</p>
               <h1>{VIEW_TITLES[activeView] || 'Panel'}</h1>
