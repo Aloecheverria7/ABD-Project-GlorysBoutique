@@ -115,6 +115,12 @@ export function POS({ variants, customers, lookups, config, user, reload }) {
       return;
     }
 
+    const selectedPago = (lookups?.tiposPago || []).find((t) => String(t.id) === String(tipoPagoId));
+    if (selectedPago?.es_credito && customerMode !== 'registered') {
+      setError('Las ventas a credito requieren un cliente registrado.');
+      return;
+    }
+
     const customerForReceipt = customerMode === 'registered'
       ? customers.find((c) => String(c.id) === String(clienteId))?.nombre || null
       : (walkinName.trim() || null);
@@ -311,7 +317,15 @@ export function POS({ variants, customers, lookups, config, user, reload }) {
         <Field label="Tipo de pago">
           <select required value={tipoPagoId} onChange={(e) => setTipoPagoId(e.target.value)}>
             <option value="">Seleccionar</option>
-            {lookups?.tiposPago.map((t) => <option key={t.id} value={t.id}>{t.nombre}</option>)}
+            {lookups?.tiposPago.map((t) => (
+              <option
+                key={t.id}
+                value={t.id}
+                disabled={t.es_credito && customerMode !== 'registered'}
+              >
+                {t.nombre}{t.es_credito ? ' (fiado)' : ''}
+              </option>
+            ))}
           </select>
         </Field>
 

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Users } from 'lucide-react';
 import { Field } from '../components/Field.jsx';
 import { api } from '../api.js';
+import { fmt } from '../utils/format.js';
 
 export function Customers({ customers, lookups, reload }) {
   const [form, setForm] = useState({ nombre: '', telefono: '', cedula: '', tipo_cliente_id: '' });
@@ -40,7 +41,14 @@ export function Customers({ customers, lookups, reload }) {
       <div className="table-wrap">
         <table>
           <thead>
-            <tr><th>Nombre</th><th>Telefono</th><th>Cedula</th><th>Tipo</th></tr>
+            <tr>
+              <th>Nombre</th>
+              <th>Telefono</th>
+              <th>Cedula</th>
+              <th>Tipo</th>
+              <th>Saldo NIO</th>
+              <th>Saldo USD</th>
+            </tr>
           </thead>
           <tbody>
             {customers.map((customer) => (
@@ -49,9 +57,15 @@ export function Customers({ customers, lookups, reload }) {
                 <td>{customer.telefono || '-'}</td>
                 <td>{customer.cedula || '-'}</td>
                 <td>{customer.tipo_cliente || '-'}</td>
+                <td className={customer.saldo_nio > 0 ? 'is-debt' : ''}>
+                  {fmt(customer.saldo_nio || 0, 'NIO')}
+                </td>
+                <td className={customer.saldo_usd > 0 ? 'is-debt' : ''}>
+                  {fmt(customer.saldo_usd || 0, 'USD')}
+                </td>
               </tr>
             ))}
-            {customers.length === 0 && <tr><td colSpan="4">Aun no hay clientes registrados.</td></tr>}
+            {customers.length === 0 && <tr><td colSpan="6">Aun no hay clientes registrados.</td></tr>}
           </tbody>
         </table>
       </div>

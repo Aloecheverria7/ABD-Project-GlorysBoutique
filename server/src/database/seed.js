@@ -4,6 +4,7 @@ import {
   Configuracion,
   Inventario,
   Producto,
+  ProductoProveedor,
   ProductoVariante,
   Proveedor,
   Role,
@@ -30,7 +31,9 @@ export async function seedDatabase() {
   ];
 
   for (const seed of seedUsers) {
-    await Usuario.upsert({
+    const existing = await Usuario.findByPk(seed.id);
+    if (existing) continue;
+    await Usuario.create({
       id: seed.id,
       username: seed.username,
       password: await bcrypt.hash(seed.plain, 10),
@@ -45,8 +48,10 @@ export async function seedDatabase() {
   ], { ignoreDuplicates: true });
 
   await TipoPago.bulkCreate([
-    { id: 1, nombre: 'Efectivo' },
-    { id: 2, nombre: 'Tarjeta' }
+    { id: 1, nombre: 'Efectivo', es_credito: false },
+    { id: 2, nombre: 'Tarjeta', es_credito: false },
+    { id: 3, nombre: 'Transferencia', es_credito: false },
+    { id: 4, nombre: 'Credito', es_credito: true }
   ], { ignoreDuplicates: true });
 
   await Categoria.bulkCreate([
@@ -63,7 +68,8 @@ export async function seedDatabase() {
   ], { ignoreDuplicates: true });
 
   await Proveedor.bulkCreate([
-    { id: 1, nombre: 'Proveedor Principal', telefono: '555-0101', direccion: 'Centro comercial' }
+    { id: 1, nombre: 'Proveedor Principal', telefono: '555-0101', direccion: 'Centro comercial' },
+    { id: 2, nombre: 'Distribuidora Modas', telefono: '555-0202', direccion: 'Av. Bolivar' }
   ], { ignoreDuplicates: true });
 
   await Producto.bulkCreate([
@@ -74,8 +80,7 @@ export async function seedDatabase() {
       precio_base: 850.00,
       precio_usd: 24.99,
       categoria_id: 1,
-      subcategoria_id: 1,
-      proveedor_id: 1
+      subcategoria_id: 1
     },
     {
       id: 2,
@@ -84,8 +89,7 @@ export async function seedDatabase() {
       precio_base: 2150.00,
       precio_usd: 59.99,
       categoria_id: 1,
-      subcategoria_id: 2,
-      proveedor_id: 1
+      subcategoria_id: 2
     },
     {
       id: 3,
@@ -94,9 +98,15 @@ export async function seedDatabase() {
       precio_base: 1250.00,
       precio_usd: 34.50,
       categoria_id: 2,
-      subcategoria_id: 3,
-      proveedor_id: 1
+      subcategoria_id: 3
     }
+  ], { ignoreDuplicates: true });
+
+  await ProductoProveedor.bulkCreate([
+    { producto_id: 1, proveedor_id: 1, costo: 450.00, moneda_costo: 'NIO' },
+    { producto_id: 1, proveedor_id: 2, costo: 12.00, moneda_costo: 'USD' },
+    { producto_id: 2, proveedor_id: 1, costo: 1200.00, moneda_costo: 'NIO' },
+    { producto_id: 3, proveedor_id: 2, costo: 650.00, moneda_costo: 'NIO' }
   ], { ignoreDuplicates: true });
 
   await ProductoVariante.bulkCreate([
