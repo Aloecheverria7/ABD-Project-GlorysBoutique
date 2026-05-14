@@ -1,17 +1,59 @@
 import React, { useState } from 'react';
-import { Users } from 'lucide-react';
+import { Pencil, Trash2, Users, X } from 'lucide-react';
 import { Field } from '../components/Field.jsx';
 import { api } from '../api.js';
 import { fmt } from '../utils/format.js';
 
-export function Customers({ customers, lookups, reload }) {
-  const [form, setForm] = useState({ nombre: '', telefono: '', cedula: '', tipo_cliente_id: '' });
+const emptyForm = { nombre: '', telefono: '', cedula: '', tipo_cliente_id: '' };
+
+export function Customers({ customers, lookups, reload, user }) {
+  const [form, setForm] = useState(emptyForm);
+  const [editingId, setEditingId] = useState(null);
+  const [error, setError] = useState('');
+  const isAdmin = user?.rol === 'admin';
+
+  function startEdit(customer) {
+    setEditingId(customer.id);
+    setForm({
+      nombre: customer.nombre || '',
+      telefono: customer.telefono || '',
+      cedula: customer.cedula || '',
+      tipo_cliente_id: customer.tipo_cliente_id ? String(customer.tipo_cliente_id) : ''
+    });
+    setError('');
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+    setForm(emptyForm);
+    setError('');
+  }
 
   async function submit(event) {
     event.preventDefault();
-    await api.post('/customers', form);
-    setForm({ nombre: '', telefono: '', cedula: '', tipo_cliente_id: '' });
-    reload();
+    setError('');
+    try {
+      if (editingId) {
+        await api.put(`/customers/${editingId}`, form);
+      } else {
+        await api.post('/customers', form);
+      }
+      cancelEdit();
+      reload();
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  async function removeCustomer(id) {
+    if (!confirm('Eliminar este cliente?')) return;
+    try {
+      await api.delete(`/customers/${id}`);
+      if (editingId === id) cancelEdit();
+      reload();
+    } catch (err) {
+      alert(err.message);
+    }
   }
 
   return (
@@ -36,7 +78,16 @@ export function Customers({ customers, lookups, reload }) {
             {lookups?.tiposCliente.map((item) => <option key={item.id} value={item.id}>{item.nombre}</option>)}
           </select>
         </Field>
-        <button type="submit">Guardar cliente</button>
+        {error && <div className="alert">{error}</div>}
+        <div className="row">
+          <button type="submit">{editingId ? 'Actualizar cliente' : 'Guardar cliente'}</button>
+          {editingId && (
+            <button type="button" className="ghost" onClick={cancelEdit}>
+              <X size={14} />
+              <span>Cancelar</span>
+            </button>
+          )}
+        </div>
       </form>
       <div className="table-wrap">
         <table>
@@ -48,6 +99,7 @@ export function Customers({ customers, lookups, reload }) {
               <th>Tipo</th>
               <th>Saldo NIO</th>
               <th>Saldo USD</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
@@ -63,9 +115,21 @@ export function Customers({ customers, lookups, reload }) {
                 <td className={customer.saldo_usd > 0 ? 'is-debt' : ''}>
                   {fmt(customer.saldo_usd || 0, 'USD')}
                 </td>
+                <td className="row-actions">
+                  <button type="button" className="ghost" onClick={() => startEdit(customer)}>
+                    <Pencil size={14} />
+                    <span>Editar</span>
+                  </button>
+                  {isAdmin && (
+                    <button type="button" className="ghost danger" onClick={() => removeCustomer(customer.id)}>
+                      <Trash2 size={14} />
+                      <span>Eliminar</span>
+                    </button>
+                  )}
+                </td>
               </tr>
             ))}
-            {customers.length === 0 && <tr><td colSpan="6">Aun no hay clientes registrados.</td></tr>}
+            {customers.length === 0 && <tr><td colSpan="7">Aun no hay clientes registrados.</td></tr>}
           </tbody>
         </table>
       </div>

@@ -41,7 +41,7 @@ export function Workspace({ user, onLogout }) {
       case 'suppliers':
         return <Suppliers suppliers={data.suppliers} products={data.products} reload={data.reload} />;
       case 'customers':
-        return <Customers customers={data.customers} lookups={data.lookups} reload={data.reload} />;
+        return <Customers customers={data.customers} lookups={data.lookups} reload={data.reload} user={user} />;
       case 'inventory':
         return <Inventory products={data.products} variants={data.variants} inventory={data.inventory} reload={data.reload} />;
       case 'pos':
