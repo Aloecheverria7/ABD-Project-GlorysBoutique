@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { PackagePlus, Plus, Trash2 } from 'lucide-react';
+import { PackagePlus, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { Field } from '../components/Field.jsx';
 import { api } from '../api.js';
 import { fmt } from '../utils/format.js';
@@ -18,6 +18,7 @@ const emptyLink = { proveedor_id: '', costo: '', moneda_costo: 'NIO' };
 export function Products({ products, suppliers = [], lookups, reload }) {
   const [form, setForm] = useState(emptyForm);
   const [supplierLinks, setSupplierLinks] = useState([]);
+  const [editingId, setEditingId] = useState(null);
   const [error, setError] = useState('');
 
   function addSupplierRow() {
@@ -30,6 +31,31 @@ export function Products({ products, suppliers = [], lookups, reload }) {
 
   function removeSupplierRow(index) {
     setSupplierLinks((current) => current.filter((_, idx) => idx !== index));
+  }
+
+  function startEdit(product) {
+    setEditingId(product.id);
+    setForm({
+      nombre: product.nombre || '',
+      descripcion: product.descripcion || '',
+      precio_base: product.precio_base != null ? String(product.precio_base) : '',
+      precio_usd: product.precio_usd != null ? String(product.precio_usd) : '',
+      categoria_id: product.categoria_id ? String(product.categoria_id) : '',
+      subcategoria_id: product.subcategoria_id ? String(product.subcategoria_id) : ''
+    });
+    setSupplierLinks((product.proveedores || []).map((p) => ({
+      proveedor_id: String(p.id),
+      costo: p.costo != null ? String(p.costo) : '',
+      moneda_costo: p.moneda_costo || 'NIO'
+    })));
+    setError('');
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+    setForm(emptyForm);
+    setSupplierLinks([]);
+    setError('');
   }
 
   async function submit(event) {
@@ -47,18 +73,34 @@ export function Products({ products, suppliers = [], lookups, reload }) {
         moneda_costo: row.moneda_costo === 'USD' ? 'USD' : 'NIO'
       }));
 
+    const payload = {
+      ...form,
+      precio_base: form.precio_base === '' ? null : form.precio_base,
+      precio_usd: form.precio_usd === '' ? null : form.precio_usd,
+      proveedores: cleaned
+    };
+
     try {
-      await api.post('/products', {
-        ...form,
-        precio_base: form.precio_base === '' ? null : form.precio_base,
-        precio_usd: form.precio_usd === '' ? null : form.precio_usd,
-        proveedores: cleaned
-      });
-      setForm(emptyForm);
-      setSupplierLinks([]);
+      if (editingId) {
+        await api.put(`/products/${editingId}`, payload);
+      } else {
+        await api.post('/products', payload);
+      }
+      cancelEdit();
       reload();
     } catch (err) {
       setError(err.message);
+    }
+  }
+
+  async function removeProduct(id) {
+    if (!confirm('Eliminar este producto? Sus variantes e inventario tambien se eliminaran.')) return;
+    try {
+      await api.delete(`/products/${id}`);
+      if (editingId === id) cancelEdit();
+      reload();
+    } catch (err) {
+      alert(err.message);
     }
   }
 
@@ -154,7 +196,15 @@ export function Products({ products, suppliers = [], lookups, reload }) {
         </div>
 
         {error && <div className="alert">{error}</div>}
-        <button type="submit">Guardar producto</button>
+        <div className="row">
+          <button type="submit">{editingId ? 'Actualizar producto' : 'Guardar producto'}</button>
+          {editingId && (
+            <button type="button" className="ghost" onClick={cancelEdit}>
+              <X size={14} />
+              <span>Cancelar</span>
+            </button>
+          )}
+        </div>
       </form>
 
       <div className="table-wrap">
@@ -166,6 +216,7 @@ export function Products({ products, suppliers = [], lookups, reload }) {
               <th>Proveedores</th>
               <th>Precio NIO</th>
               <th>Precio USD</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
@@ -186,9 +237,19 @@ export function Products({ products, suppliers = [], lookups, reload }) {
                 </td>
                 <td>{product.precio_base != null ? fmt(product.precio_base, 'NIO') : '—'}</td>
                 <td>{product.precio_usd != null ? fmt(product.precio_usd, 'USD') : '—'}</td>
+                <td className="row-actions">
+                  <button type="button" className="ghost" onClick={() => startEdit(product)}>
+                    <Pencil size={14} />
+                    <span>Editar</span>
+                  </button>
+                  <button type="button" className="ghost danger" onClick={() => removeProduct(product.id)}>
+                    <Trash2 size={14} />
+                    <span>Eliminar</span>
+                  </button>
+                </td>
               </tr>
             ))}
-            {products.length === 0 && <tr><td colSpan="5">Aun no hay productos registrados.</td></tr>}
+            {products.length === 0 && <tr><td colSpan="6">Aun no hay productos registrados.</td></tr>}
           </tbody>
         </table>
       </div>
