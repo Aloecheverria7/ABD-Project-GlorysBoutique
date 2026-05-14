@@ -53,9 +53,20 @@ export const Producto = sequelize.define('Producto', {
   precio_base: { type: DataTypes.DECIMAL(10, 2), allowNull: true },
   precio_usd: { type: DataTypes.DECIMAL(10, 2), allowNull: true },
   categoria_id: DataTypes.INTEGER,
-  subcategoria_id: DataTypes.INTEGER,
-  proveedor_id: DataTypes.INTEGER
+  subcategoria_id: DataTypes.INTEGER
 }, { tableName: 'productos', timestamps: false });
+
+export const ProductoProveedor = sequelize.define('ProductoProveedor', {
+  id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  producto_id: { type: DataTypes.INTEGER, allowNull: false },
+  proveedor_id: { type: DataTypes.INTEGER, allowNull: false },
+  costo: { type: DataTypes.DECIMAL(10, 2), allowNull: true },
+  moneda_costo: { type: DataTypes.STRING(3), allowNull: false, defaultValue: 'NIO' }
+}, {
+  tableName: 'producto_proveedores',
+  timestamps: false,
+  indexes: [{ name: 'uq_producto_proveedor', unique: true, fields: ['producto_id', 'proveedor_id'] }]
+});
 
 export const ProductoVariante = sequelize.define('ProductoVariante', {
   id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
@@ -72,7 +83,8 @@ export const Inventario = sequelize.define('Inventario', {
 
 export const TipoPago = sequelize.define('TipoPago', {
   id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
-  nombre: { type: DataTypes.STRING(50), allowNull: false }
+  nombre: { type: DataTypes.STRING(50), allowNull: false },
+  es_credito: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false }
 }, { tableName: 'tipos_pago', timestamps: false });
 
 export const Venta = sequelize.define('Venta', {
@@ -101,6 +113,37 @@ export const DetalleVenta = sequelize.define('DetalleVenta', {
   precio_unitario: { type: DataTypes.DECIMAL(10, 2), allowNull: false }
 }, { tableName: 'detalle_ventas', timestamps: false });
 
+export const Compra = sequelize.define('Compra', {
+  id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  proveedor_id: { type: DataTypes.INTEGER, allowNull: false },
+  usuario_id: DataTypes.INTEGER,
+  total: { type: DataTypes.DECIMAL(10, 2), allowNull: false, defaultValue: 0 },
+  moneda: { type: DataTypes.STRING(3), allowNull: false, defaultValue: 'NIO' },
+  tasa_cambio: DataTypes.DECIMAL(10, 4),
+  notas: DataTypes.STRING(255),
+  fecha: { type: DataTypes.DATE, defaultValue: DataTypes.NOW }
+}, { tableName: 'compras', timestamps: false });
+
+export const DetalleCompra = sequelize.define('DetalleCompra', {
+  id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  compra_id: { type: DataTypes.INTEGER, allowNull: false },
+  producto_variante_id: { type: DataTypes.INTEGER, allowNull: false },
+  cantidad: { type: DataTypes.INTEGER, allowNull: false },
+  costo_unitario: { type: DataTypes.DECIMAL(10, 2), allowNull: false }
+}, { tableName: 'detalle_compras', timestamps: false });
+
+export const Abono = sequelize.define('Abono', {
+  id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  cliente_id: { type: DataTypes.INTEGER, allowNull: false },
+  tipo_pago_id: { type: DataTypes.INTEGER, allowNull: false },
+  usuario_id: DataTypes.INTEGER,
+  monto: { type: DataTypes.DECIMAL(10, 2), allowNull: false },
+  moneda: { type: DataTypes.STRING(3), allowNull: false, defaultValue: 'NIO' },
+  tasa_cambio: DataTypes.DECIMAL(10, 4),
+  notas: DataTypes.STRING(255),
+  fecha: { type: DataTypes.DATE, defaultValue: DataTypes.NOW }
+}, { tableName: 'abonos', timestamps: false });
+
 Role.hasMany(Usuario, { foreignKey: 'rol_id' });
 Usuario.belongsTo(Role, { foreignKey: 'rol_id' });
 
@@ -116,8 +159,22 @@ Producto.belongsTo(Categoria, { foreignKey: 'categoria_id', as: 'categoriaInfo' 
 Subcategoria.hasMany(Producto, { foreignKey: 'subcategoria_id' });
 Producto.belongsTo(Subcategoria, { foreignKey: 'subcategoria_id', as: 'subcategoriaInfo' });
 
-Proveedor.hasMany(Producto, { foreignKey: 'proveedor_id' });
-Producto.belongsTo(Proveedor, { foreignKey: 'proveedor_id', as: 'proveedorInfo' });
+Producto.belongsToMany(Proveedor, {
+  through: ProductoProveedor,
+  foreignKey: 'producto_id',
+  otherKey: 'proveedor_id',
+  as: 'proveedores'
+});
+Proveedor.belongsToMany(Producto, {
+  through: ProductoProveedor,
+  foreignKey: 'proveedor_id',
+  otherKey: 'producto_id',
+  as: 'productos'
+});
+ProductoProveedor.belongsTo(Producto, { foreignKey: 'producto_id', as: 'productoInfo' });
+ProductoProveedor.belongsTo(Proveedor, { foreignKey: 'proveedor_id', as: 'proveedorInfo' });
+Producto.hasMany(ProductoProveedor, { foreignKey: 'producto_id', as: 'proveedoresLink' });
+Proveedor.hasMany(ProductoProveedor, { foreignKey: 'proveedor_id', as: 'productosLink' });
 
 Producto.hasMany(ProductoVariante, { foreignKey: 'producto_id', as: 'variantes' });
 ProductoVariante.belongsTo(Producto, { foreignKey: 'producto_id', as: 'productoInfo' });
@@ -140,13 +197,38 @@ DetalleVenta.belongsTo(Venta, { foreignKey: 'venta_id' });
 ProductoVariante.hasMany(DetalleVenta, { foreignKey: 'producto_variante_id' });
 DetalleVenta.belongsTo(ProductoVariante, { foreignKey: 'producto_variante_id', as: 'varianteInfo' });
 
+Proveedor.hasMany(Compra, { foreignKey: 'proveedor_id' });
+Compra.belongsTo(Proveedor, { foreignKey: 'proveedor_id', as: 'proveedorInfo' });
+
+Usuario.hasMany(Compra, { foreignKey: 'usuario_id' });
+Compra.belongsTo(Usuario, { foreignKey: 'usuario_id', as: 'usuarioInfo' });
+
+Compra.hasMany(DetalleCompra, { foreignKey: 'compra_id', as: 'details' });
+DetalleCompra.belongsTo(Compra, { foreignKey: 'compra_id' });
+
+ProductoVariante.hasMany(DetalleCompra, { foreignKey: 'producto_variante_id' });
+DetalleCompra.belongsTo(ProductoVariante, { foreignKey: 'producto_variante_id', as: 'varianteInfo' });
+
+Cliente.hasMany(Abono, { foreignKey: 'cliente_id', as: 'abonos' });
+Abono.belongsTo(Cliente, { foreignKey: 'cliente_id', as: 'clienteInfo' });
+
+TipoPago.hasMany(Abono, { foreignKey: 'tipo_pago_id' });
+Abono.belongsTo(TipoPago, { foreignKey: 'tipo_pago_id', as: 'tipoPagoInfo' });
+
+Usuario.hasMany(Abono, { foreignKey: 'usuario_id' });
+Abono.belongsTo(Usuario, { foreignKey: 'usuario_id', as: 'usuarioInfo' });
+
 export const models = {
+  Abono,
   Categoria,
   Cliente,
+  Compra,
   Configuracion,
+  DetalleCompra,
   DetalleVenta,
   Inventario,
   Producto,
+  ProductoProveedor,
   ProductoVariante,
   Proveedor,
   Role,

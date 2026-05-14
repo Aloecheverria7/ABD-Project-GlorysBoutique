@@ -9,6 +9,12 @@ import { Customers } from './views/Customers.jsx';
 import { Inventory } from './views/Inventory.jsx';
 import { POS } from './views/POS.jsx';
 import { Sales } from './views/Sales.jsx';
+import { Suppliers } from './views/Suppliers.jsx';
+import { Purchases } from './views/Purchases.jsx';
+import { PurchaseHistory } from './views/PurchaseHistory.jsx';
+import { UsersView } from './views/Users.jsx';
+import { PaymentTypes } from './views/PaymentTypes.jsx';
+import { Payments } from './views/Payments.jsx';
 import { useBootstrap } from './hooks/useBootstrap.js';
 import { canAccess, visibleMenu } from './utils/menu.js';
 import { VIEW_TITLES } from './constants.js';
@@ -31,7 +37,9 @@ export function Workspace({ user, onLogout }) {
     }
     switch (activeView) {
       case 'products':
-        return <Products products={data.products} lookups={data.lookups} reload={data.reload} />;
+        return <Products products={data.products} suppliers={data.suppliers} lookups={data.lookups} reload={data.reload} />;
+      case 'suppliers':
+        return <Suppliers suppliers={data.suppliers} products={data.products} reload={data.reload} />;
       case 'customers':
         return <Customers customers={data.customers} lookups={data.lookups} reload={data.reload} />;
       case 'inventory':
@@ -40,6 +48,16 @@ export function Workspace({ user, onLogout }) {
         return <POS variants={data.variants} customers={data.customers} lookups={data.lookups} config={data.config} user={user} reload={data.reload} />;
       case 'sales':
         return <Sales sales={data.sales} user={user} />;
+      case 'purchases':
+        return <Purchases variants={data.variants} suppliers={data.suppliers} config={data.config} reload={data.reload} />;
+      case 'purchaseHistory':
+        return <PurchaseHistory purchases={data.purchases} />;
+      case 'users':
+        return <UsersView users={data.users} lookups={data.lookups} currentUser={user} reload={data.reload} />;
+      case 'paymentTypes':
+        return <PaymentTypes paymentTypes={data.paymentTypes} reload={data.reload} />;
+      case 'payments':
+        return <Payments abonos={data.abonos} customers={data.customers} paymentTypes={data.paymentTypes} reload={data.reload} />;
       case 'config':
         return <Configuration config={data.config} onUpdated={data.updateConfig} />;
       case 'dashboard':

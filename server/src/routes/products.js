@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { sequelize } from '../db.js';
-import { Categoria, Inventario, Producto, ProductoVariante, Proveedor, Subcategoria } from '../models/index.js';
+import { Categoria, Inventario, Producto, ProductoProveedor, ProductoVariante, Proveedor, Subcategoria } from '../models/index.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { asyncHandler, sendCreated } from '../utils/http.js';
 
@@ -11,16 +11,23 @@ const adminOnly = requireRole('admin');
 
 function formatProduct(product) {
   const data = product.get({ plain: true });
+  const proveedores = (data.proveedores || []).map((prov) => ({
+    id: prov.id,
+    nombre: prov.nombre,
+    costo: prov.ProductoProveedor?.costo != null ? Number(prov.ProductoProveedor.costo) : null,
+    moneda_costo: prov.ProductoProveedor?.moneda_costo || 'NIO'
+  }));
   return {
-    ...data,
+    id: data.id,
+    nombre: data.nombre,
+    descripcion: data.descripcion,
     precio_base: data.precio_base != null ? Number(data.precio_base) : null,
     precio_usd: data.precio_usd != null ? Number(data.precio_usd) : null,
+    categoria_id: data.categoria_id,
+    subcategoria_id: data.subcategoria_id,
     categoria: data.categoriaInfo?.nombre || null,
     subcategoria: data.subcategoriaInfo?.nombre || null,
-    proveedor: data.proveedorInfo?.nombre || null,
-    categoriaInfo: undefined,
-    subcategoriaInfo: undefined,
-    proveedorInfo: undefined
+    proveedores
   };
 }
 
@@ -45,20 +52,27 @@ function parseOptionalPrice(value) {
   return parsed;
 }
 
+const PRODUCT_INCLUDE = [
+  { model: Categoria, as: 'categoriaInfo', attributes: ['nombre'] },
+  { model: Subcategoria, as: 'subcategoriaInfo', attributes: ['nombre'] },
+  {
+    model: Proveedor,
+    as: 'proveedores',
+    attributes: ['id', 'nombre'],
+    through: { attributes: ['costo', 'moneda_costo'] }
+  }
+];
+
 productsRouter.get('/', asyncHandler(async (_req, res) => {
   const products = await Producto.findAll({
-    include: [
-      { model: Categoria, as: 'categoriaInfo', attributes: ['nombre'] },
-      { model: Subcategoria, as: 'subcategoriaInfo', attributes: ['nombre'] },
-      { model: Proveedor, as: 'proveedorInfo', attributes: ['nombre'] }
-    ],
+    include: PRODUCT_INCLUDE,
     order: [['id', 'DESC']]
   });
   res.json(products.map(formatProduct));
 }));
 
 productsRouter.post('/', adminOnly, asyncHandler(async (req, res) => {
-  const { nombre, descripcion, precio_base, precio_usd, categoria_id, subcategoria_id, proveedor_id } = req.body;
+  const { nombre, descripcion, precio_base, precio_usd, categoria_id, subcategoria_id, proveedores } = req.body;
 
   const nio = parseOptionalPrice(precio_base);
   const usd = parseOptionalPrice(precio_usd);
@@ -71,20 +85,34 @@ productsRouter.post('/', adminOnly, asyncHandler(async (req, res) => {
     return;
   }
 
-  const product = await Producto.create({
-    nombre,
-    descripcion: descripcion || null,
-    precio_base: nio,
-    precio_usd: usd,
-    categoria_id: categoria_id || null,
-    subcategoria_id: subcategoria_id || null,
-    proveedor_id: proveedor_id || null
+  const product = await sequelize.transaction(async (transaction) => {
+    const created = await Producto.create({
+      nombre,
+      descripcion: descripcion || null,
+      precio_base: nio,
+      precio_usd: usd,
+      categoria_id: categoria_id || null,
+      subcategoria_id: subcategoria_id || null
+    }, { transaction });
+
+    if (Array.isArray(proveedores) && proveedores.length > 0) {
+      await ProductoProveedor.bulkCreate(proveedores.map((p) => ({
+        producto_id: created.id,
+        proveedor_id: Number(p.proveedor_id || p.id),
+        costo: p.costo === '' || p.costo == null ? null : Number(p.costo),
+        moneda_costo: p.moneda_costo === 'USD' ? 'USD' : 'NIO'
+      })), { transaction });
+    }
+
+    return created;
   });
-  sendCreated(res, formatProduct(product));
+
+  const refreshed = await Producto.findByPk(product.id, { include: PRODUCT_INCLUDE });
+  sendCreated(res, formatProduct(refreshed));
 }));
 
 productsRouter.put('/:id', adminOnly, asyncHandler(async (req, res) => {
-  const { nombre, descripcion, precio_base, precio_usd, categoria_id, subcategoria_id, proveedor_id } = req.body;
+  const { nombre, descripcion, precio_base, precio_usd, categoria_id, subcategoria_id, proveedores } = req.body;
   const product = await Producto.findByPk(req.params.id);
 
   if (!product) {
@@ -103,16 +131,31 @@ productsRouter.put('/:id', adminOnly, asyncHandler(async (req, res) => {
     return;
   }
 
-  await product.update({
-    nombre,
-    descripcion: descripcion || null,
-    precio_base: nio,
-    precio_usd: usd,
-    categoria_id: categoria_id || null,
-    subcategoria_id: subcategoria_id || null,
-    proveedor_id: proveedor_id || null
+  await sequelize.transaction(async (transaction) => {
+    await product.update({
+      nombre,
+      descripcion: descripcion || null,
+      precio_base: nio,
+      precio_usd: usd,
+      categoria_id: categoria_id || null,
+      subcategoria_id: subcategoria_id || null
+    }, { transaction });
+
+    if (Array.isArray(proveedores)) {
+      await ProductoProveedor.destroy({ where: { producto_id: product.id }, transaction });
+      if (proveedores.length > 0) {
+        await ProductoProveedor.bulkCreate(proveedores.map((p) => ({
+          producto_id: product.id,
+          proveedor_id: Number(p.proveedor_id || p.id),
+          costo: p.costo === '' || p.costo == null ? null : Number(p.costo),
+          moneda_costo: p.moneda_costo === 'USD' ? 'USD' : 'NIO'
+        })), { transaction });
+      }
+    }
   });
-  res.json(formatProduct(product));
+
+  const refreshed = await Producto.findByPk(product.id, { include: PRODUCT_INCLUDE });
+  res.json(formatProduct(refreshed));
 }));
 
 productsRouter.delete('/:id', adminOnly, asyncHandler(async (req, res) => {

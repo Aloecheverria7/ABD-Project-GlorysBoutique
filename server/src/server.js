@@ -10,8 +10,13 @@ import { catalogRouter } from './routes/catalog.js';
 import { configRouter } from './routes/config.js';
 import { customersRouter } from './routes/customers.js';
 import { inventoryRouter } from './routes/inventory.js';
+import { paymentTypesRouter } from './routes/paymentTypes.js';
+import { paymentsRouter } from './routes/payments.js';
 import { productsRouter } from './routes/products.js';
+import { purchasesRouter } from './routes/purchases.js';
 import { salesRouter } from './routes/sales.js';
+import { suppliersRouter } from './routes/suppliers.js';
+import { usersRouter } from './routes/users.js';
 
 dotenv.config();
 
@@ -37,8 +42,13 @@ app.use('/api/catalog', catalogRouter);
 app.use('/api/config', configRouter);
 app.use('/api/customers', customersRouter);
 app.use('/api/products', productsRouter);
+app.use('/api/suppliers', suppliersRouter);
 app.use('/api/inventory', inventoryRouter);
 app.use('/api/sales', salesRouter);
+app.use('/api/purchases', purchasesRouter);
+app.use('/api/users', usersRouter);
+app.use('/api/payment-types', paymentTypesRouter);
+app.use('/api/payments', paymentsRouter);
 
 app.use((req, res) => {
   res.status(404).json({ message: `Route not found: ${req.method} ${req.originalUrl}` });

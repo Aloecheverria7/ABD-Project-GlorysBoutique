@@ -10,6 +10,11 @@ export function useBootstrap(user) {
     customers: [],
     inventory: [],
     sales: [],
+    suppliers: [],
+    purchases: [],
+    users: [],
+    abonos: [],
+    paymentTypes: [],
     lookups: null,
     config: { tasa_cambio_usd: DEFAULT_RATE, updated_at: null },
     loading: true,
@@ -21,19 +26,42 @@ export function useBootstrap(user) {
     try {
       setState((current) => ({ ...current, loading: true, error: '' }));
 
-      const [variants, customers, sales, lookups, config] = await Promise.all([
+      const [variants, customers, sales, lookups, config, abonos, paymentTypes] = await Promise.all([
         api.get('/products/variants'),
         api.get('/customers'),
         api.get('/sales'),
         api.get('/catalog/lookups'),
-        api.get('/config')
+        api.get('/config'),
+        api.get('/payments'),
+        api.get('/payment-types')
       ]);
 
-      const [products, inventory] = isAdmin
-        ? await Promise.all([api.get('/products'), api.get('/inventory')])
-        : [[], []];
+      const [products, inventory, suppliers, purchases, users] = isAdmin
+        ? await Promise.all([
+            api.get('/products'),
+            api.get('/inventory'),
+            api.get('/suppliers'),
+            api.get('/purchases'),
+            api.get('/users')
+          ])
+        : [[], [], [], [], []];
 
-      setState({ products, variants, customers, inventory, sales, lookups, config, loading: false, error: '' });
+      setState({
+        products,
+        variants,
+        customers,
+        inventory,
+        sales,
+        suppliers,
+        purchases,
+        users,
+        abonos,
+        paymentTypes,
+        lookups,
+        config,
+        loading: false,
+        error: ''
+      });
     } catch (error) {
       setState((current) => ({ ...current, loading: false, error: error.message }));
     }

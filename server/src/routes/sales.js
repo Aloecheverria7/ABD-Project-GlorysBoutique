@@ -88,6 +88,14 @@ salesRouter.post('/', asyncHandler(async (req, res) => {
     return;
   }
 
+  if (tipo_pago_id) {
+    const tipoPago = await TipoPago.findByPk(tipo_pago_id);
+    if (tipoPago?.es_credito && !cliente_id) {
+      res.status(400).json({ message: 'Las ventas a credito requieren un cliente registrado.' });
+      return;
+    }
+  }
+
   const saleCurrency = moneda === 'USD' ? 'USD' : 'NIO';
   let tasaCambio = null;
   if (saleCurrency === 'USD') {
