@@ -4,7 +4,7 @@ import { Sequelize } from 'sequelize';
 dotenv.config();
 
 export const sequelize = new Sequelize(
-  process.env.DB_NAME || 'glorysboutique_BD',
+  process.env.DB_NAME || 'glorysboutique_bd',
   process.env.DB_USER || 'root',
   process.env.DB_PASSWORD || '',
   {
