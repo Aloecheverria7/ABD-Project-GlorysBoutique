@@ -1,3 +1,4 @@
+/** @file Vista de gestion de clientes: alta, edicion, eliminacion y listado con saldos por moneda. */
 import React, { useState } from 'react';
 import { Pencil, Trash2, Users, X } from 'lucide-react';
 import { Field } from '../components/Field.jsx';
@@ -6,12 +7,30 @@ import { fmt } from '../utils/format.js';
 
 const emptyForm = { nombre: '', telefono: '', cedula: '', tipo_cliente_id: '' };
 
+/**
+ * Vista de gestion de clientes que permite registrar, editar y eliminar clientes,
+ * ademas de listarlos con sus saldos pendientes en NIO y USD. La eliminacion solo
+ * esta disponible para usuarios con rol de administrador.
+ *
+ * @param {Object} props
+ * @param {Array<Object>} props.customers - Lista de clientes a mostrar.
+ * @param {{ tiposCliente: Array<{ id: number, nombre: string }> }} props.lookups - Catalogos auxiliares, incluye los tipos de cliente.
+ * @param {Function} props.reload - Funcion que recarga los datos tras una operacion.
+ * @param {{ username: string, rol: string }} props.user - Usuario en sesion; su rol habilita la opcion de eliminar.
+ * @returns {JSX.Element}
+ */
 export function Customers({ customers, lookups, reload, user }) {
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState(null);
   const [error, setError] = useState('');
   const isAdmin = user?.rol === 'admin';
 
+  /**
+   * Carga los datos de un cliente en el formulario para editarlo.
+   *
+   * @param {Object} customer - Cliente seleccionado para editar.
+   * @returns {void}
+   */
   function startEdit(customer) {
     setEditingId(customer.id);
     setForm({
@@ -23,12 +42,24 @@ export function Customers({ customers, lookups, reload, user }) {
     setError('');
   }
 
+  /**
+   * Cancela la edicion en curso y restablece el formulario a su estado inicial.
+   *
+   * @returns {void}
+   */
   function cancelEdit() {
     setEditingId(null);
     setForm(emptyForm);
     setError('');
   }
 
+  /**
+   * Envia el formulario para crear un cliente nuevo o actualizar el cliente en edicion,
+   * y recarga los datos al finalizar.
+   *
+   * @param {React.FormEvent} event - Evento de envio del formulario.
+   * @returns {Promise<void>}
+   */
   async function submit(event) {
     event.preventDefault();
     setError('');
@@ -45,6 +76,13 @@ export function Customers({ customers, lookups, reload, user }) {
     }
   }
 
+  /**
+   * Solicita confirmacion y elimina un cliente; si estaba en edicion cancela el
+   * formulario y recarga los datos.
+   *
+   * @param {number} id - Identificador del cliente a eliminar.
+   * @returns {Promise<void>}
+   */
   async function removeCustomer(id) {
     if (!confirm('Eliminar este cliente?')) return;
     try {
@@ -67,10 +105,21 @@ export function Customers({ customers, lookups, reload, user }) {
           <input required value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} />
         </Field>
         <Field label="Telefono">
-          <input value={form.telefono} onChange={(e) => setForm({ ...form, telefono: e.target.value })} />
+          <input
+            value={form.telefono}
+            inputMode="numeric"
+            maxLength={8}
+            placeholder="8 digitos"
+            onChange={(e) => setForm({ ...form, telefono: e.target.value.replace(/\D/g, '').slice(0, 8) })}
+          />
         </Field>
         <Field label="Cedula">
-          <input value={form.cedula} onChange={(e) => setForm({ ...form, cedula: e.target.value })} />
+          <input
+            value={form.cedula}
+            maxLength={16}
+            placeholder="001-150792-1004M"
+            onChange={(e) => setForm({ ...form, cedula: e.target.value.replace(/[^0-9A-Za-z-]/g, '').slice(0, 16) })}
+          />
         </Field>
         <Field label="Tipo">
           <select value={form.tipo_cliente_id} onChange={(e) => setForm({ ...form, tipo_cliente_id: e.target.value })}>

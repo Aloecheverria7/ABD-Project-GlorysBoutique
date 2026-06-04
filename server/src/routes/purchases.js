@@ -1,3 +1,4 @@
+/** @file Rutas de compras a proveedores: registro de compras con sus detalles y aumento de inventario. */
 import { Router } from 'express';
 import { sequelize } from '../db.js';
 import { Compra, Configuracion, DetalleCompra, Inventario, Producto, ProductoVariante, Proveedor, Usuario } from '../models/index.js';
@@ -9,6 +10,13 @@ export const purchasesRouter = Router();
 purchasesRouter.use(requireAuth);
 const adminOnly = requireRole('admin');
 
+/**
+ * Convierte una instancia de Compra a un objeto plano para la respuesta JSON,
+ * resolviendo los nombres de proveedor y usuario a partir de las relaciones incluidas.
+ *
+ * @param {import('sequelize').Model} purchase - Instancia Sequelize de Compra con 'proveedorInfo' y 'usuarioInfo'.
+ * @returns {{ id: number, proveedor_id: number, proveedor: (string|null), usuario_id: number, usuario: (string|null), total: number, moneda: string, tasa_cambio: (number|null), notas: (string|null), fecha: Date }} Compra normalizada.
+ */
 function formatPurchase(purchase) {
   const data = purchase.get({ plain: true });
   return {
@@ -25,6 +33,13 @@ function formatPurchase(purchase) {
   };
 }
 
+/**
+ * Convierte una instancia de DetalleCompra a un objeto plano para la respuesta JSON,
+ * incluyendo el nombre del producto, color y talla de la variante asociada.
+ *
+ * @param {import('sequelize').Model} detail - Instancia Sequelize de DetalleCompra con 'varianteInfo' y su 'productoInfo'.
+ * @returns {{ id: number, compra_id: number, producto_variante_id: number, cantidad: number, costo_unitario: number, producto: (string|null), color: (string|null), talla: (string|null) }} Detalle normalizado.
+ */
 function formatDetail(detail) {
   const data = detail.get({ plain: true });
   return {
@@ -39,6 +54,14 @@ function formatDetail(detail) {
   };
 }
 
+/**
+ * GET /api/purchases - Lista todas las compras ordenadas por fecha descendente.
+ * Solo accesible para el rol admin.
+ *
+ * @param {import('express').Request} _req - Peticion HTTP (no usa parametros).
+ * @param {import('express').Response} res - Responde con un arreglo de compras normalizadas.
+ * @returns {Promise<void>}
+ */
 purchasesRouter.get('/', adminOnly, asyncHandler(async (_req, res) => {
   const purchases = await Compra.findAll({
     include: [
@@ -50,6 +73,15 @@ purchasesRouter.get('/', adminOnly, asyncHandler(async (_req, res) => {
   res.json(purchases.map(formatPurchase));
 }));
 
+/**
+ * GET /api/purchases/:id - Devuelve una compra con el detalle de sus renglones.
+ * Solo accesible para el rol admin.
+ *
+ * @param {import('express').Request} req - Peticion HTTP. Usa req.params.id (id de la compra).
+ * @param {import('express').Response} res - Responde con la compra normalizada mas su arreglo 'details',
+ *   o 404 si la compra no existe.
+ * @returns {Promise<void>}
+ */
 purchasesRouter.get('/:id', adminOnly, asyncHandler(async (req, res) => {
   const purchase = await Compra.findByPk(req.params.id, {
     include: [
@@ -75,6 +107,19 @@ purchasesRouter.get('/:id', adminOnly, asyncHandler(async (req, res) => {
   res.json({ ...formatPurchase(purchase), details: details.map(formatDetail) });
 }));
 
+/**
+ * POST /api/purchases - Registra una compra a un proveedor con sus renglones y aumenta el inventario.
+ * Solo accesible para el rol admin. El total se calcula sumando cantidad por costo unitario de cada item.
+ * Si la moneda es USD, toma la tasa de cambio de la Configuracion (id 1). La compra, sus detalles y la
+ * actualizacion de inventario se ejecutan dentro de una transaccion.
+ *
+ * @param {import('express').Request} req - Peticion HTTP. Usa req.user.id (usuario autenticado) y req.body:
+ *   { proveedor_id, items, moneda, notas }. items es un arreglo de
+ *   { producto_variante_id, cantidad, costo_unitario }.
+ * @param {import('express').Response} res - Responde 201 con { id, proveedor_id, total, moneda, tasa_cambio, fecha };
+ *   400 si falta proveedor, no hay items, algun renglon es invalido, el proveedor no existe o la tasa USD no esta configurada.
+ * @returns {Promise<void>}
+ */
 purchasesRouter.post('/', adminOnly, asyncHandler(async (req, res) => {
   const { proveedor_id, items, moneda, notas } = req.body;
   const usuario_id = req.user.id;
@@ -130,6 +175,10 @@ purchasesRouter.post('/', adminOnly, asyncHandler(async (req, res) => {
       costo_unitario: Number(item.costo_unitario)
     })), { transaction });
 
+    // Regla de negocio: una compra es el espejo de una venta sobre el inventario: en lugar de
+    // descontar, aumenta las existencias de cada variante. Si la variante aun no tiene fila de
+    // inventario se crea en cero (findOrCreate) y luego se suma la cantidad comprada. El bloqueo
+    // (lock) evita condiciones de carrera con ventas/compras concurrentes sobre la misma variante.
     for (const item of items) {
       const [inventory] = await Inventario.findOrCreate({
         where: { producto_variante_id: Number(item.producto_variante_id) },

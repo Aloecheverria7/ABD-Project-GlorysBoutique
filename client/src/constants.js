@@ -1,3 +1,9 @@
+/**
+ * @file Constantes compartidas de la aplicacion. Define DEFAULT_RATE (tasa de cambio
+ * por defecto USD), MENU (estructura del menu lateral agrupado por seccion, con los
+ * roles autorizados para cada item) y VIEW_TITLES (titulos legibles de cada vista
+ * indexados por su identificador).
+ */
 import {
   Boxes,
   CreditCard,
@@ -10,7 +16,8 @@ import {
   Tags,
   Truck,
   UserCog,
-  Users
+  Users,
+  Wallet
 } from 'lucide-react';
 
 export const DEFAULT_RATE = 36.62;
@@ -39,7 +46,8 @@ export const MENU = [
       { id: 'pos', label: 'Punto de venta', icon: ShoppingCart, roles: ['admin', 'vendedor'] },
       { id: 'customers', label: 'Clientes', icon: Users, roles: ['admin', 'vendedor'] },
       { id: 'sales', label: 'Historial de ventas', icon: CreditCard, roles: ['admin', 'vendedor'] },
-      { id: 'payments', label: 'Abonos', icon: HandCoins, roles: ['admin', 'vendedor'] }
+      { id: 'payments', label: 'Abonos', icon: HandCoins, roles: ['admin', 'vendedor'] },
+      { id: 'caja', label: 'Caja', icon: Wallet, roles: ['admin', 'vendedor'] }
     ]
   },
   {
@@ -63,6 +71,7 @@ export const VIEW_TITLES = {
   customers: 'Clientes',
   sales: 'Historial de ventas',
   payments: 'Abonos',
+  caja: 'Caja',
   purchases: 'Nueva compra',
   purchaseHistory: 'Historial de compras'
 };

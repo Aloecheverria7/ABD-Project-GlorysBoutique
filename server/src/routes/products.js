@@ -1,3 +1,4 @@
+/** @file Rutas de productos: CRUD de productos, sus proveedores y variantes con inventario. */
 import { Router } from 'express';
 import { sequelize } from '../db.js';
 import { Categoria, Inventario, Producto, ProductoProveedor, ProductoVariante, Proveedor, Subcategoria } from '../models/index.js';
@@ -9,6 +10,12 @@ export const productsRouter = Router();
 productsRouter.use(requireAuth);
 const adminOnly = requireRole('admin');
 
+/**
+ * Da formato a un producto resolviendo precios numericos, nombres de categoria/subcategoria y proveedores con costos.
+ *
+ * @param {object} product - Instancia Sequelize del producto con asociaciones categoriaInfo, subcategoriaInfo y proveedores.
+ * @returns {object} Producto plano con precios numericos, nombres resueltos y arreglo de proveedores.
+ */
 function formatProduct(product) {
   const data = product.get({ plain: true });
   const proveedores = (data.proveedores || []).map((prov) => ({
@@ -31,6 +38,12 @@ function formatProduct(product) {
   };
 }
 
+/**
+ * Da formato a una variante de producto resolviendo el nombre del producto, sus precios y la cantidad en inventario.
+ *
+ * @param {object} variant - Instancia Sequelize de la variante con asociaciones productoInfo e inventario.
+ * @returns {object} Variante plana con producto, precios, color, talla y cantidad.
+ */
 function formatVariant(variant) {
   const data = variant.get({ plain: true });
   return {
@@ -45,6 +58,12 @@ function formatVariant(variant) {
   };
 }
 
+/**
+ * Convierte un precio opcional a numero, distinguiendo entre ausente e invalido.
+ *
+ * @param {string|number|null|undefined} value - Valor de precio a interpretar.
+ * @returns {number|null|undefined} El numero parseado, null si el valor esta vacio o ausente, o undefined si es invalido o negativo.
+ */
 function parseOptionalPrice(value) {
   if (value === '' || value === null || value === undefined) return null;
   const parsed = Number(value);
@@ -63,6 +82,13 @@ const PRODUCT_INCLUDE = [
   }
 ];
 
+/**
+ * GET /api/products - Lista los productos con categoria, subcategoria y proveedores, ordenados por id descendente.
+ *
+ * @param {import('express').Request} _req - No utiliza datos de la peticion.
+ * @param {import('express').Response} res - Responde 200 con el arreglo de productos formateados.
+ * @returns {Promise<void>}
+ */
 productsRouter.get('/', asyncHandler(async (_req, res) => {
   const products = await Producto.findAll({
     include: PRODUCT_INCLUDE,
@@ -71,6 +97,14 @@ productsRouter.get('/', asyncHandler(async (_req, res) => {
   res.json(products.map(formatProduct));
 }));
 
+/**
+ * POST /api/products - Crea un producto y, opcionalmente, sus proveedores asociados. Requiere rol admin.
+ * Exige al menos un precio (NIO o USD) y los crea dentro de una transaccion junto con la tabla ProductoProveedor.
+ *
+ * @param {import('express').Request} req - req.body con { nombre, descripcion, precio_base, precio_usd, categoria_id, subcategoria_id, proveedores }.
+ * @param {import('express').Response} res - Responde 201 con el producto creado o 400 si los precios son invalidos o faltan ambos.
+ * @returns {Promise<void>}
+ */
 productsRouter.post('/', adminOnly, asyncHandler(async (req, res) => {
   const { nombre, descripcion, precio_base, precio_usd, categoria_id, subcategoria_id, proveedores } = req.body;
 
@@ -111,6 +145,14 @@ productsRouter.post('/', adminOnly, asyncHandler(async (req, res) => {
   sendCreated(res, formatProduct(refreshed));
 }));
 
+/**
+ * PUT /api/products/:id - Actualiza un producto y reemplaza sus proveedores. Requiere rol admin.
+ * Si se envia el arreglo de proveedores, elimina los existentes y vuelve a crearlos dentro de una transaccion.
+ *
+ * @param {import('express').Request} req - req.params.id identifica al producto; req.body con { nombre, descripcion, precio_base, precio_usd, categoria_id, subcategoria_id, proveedores }.
+ * @param {import('express').Response} res - Responde 200 con el producto actualizado, 400 si los precios son invalidos o 404 si no existe.
+ * @returns {Promise<void>}
+ */
 productsRouter.put('/:id', adminOnly, asyncHandler(async (req, res) => {
   const { nombre, descripcion, precio_base, precio_usd, categoria_id, subcategoria_id, proveedores } = req.body;
   const product = await Producto.findByPk(req.params.id);
@@ -158,6 +200,13 @@ productsRouter.put('/:id', adminOnly, asyncHandler(async (req, res) => {
   res.json(formatProduct(refreshed));
 }));
 
+/**
+ * DELETE /api/products/:id - Elimina un producto. Requiere rol admin.
+ *
+ * @param {import('express').Request} req - req.params.id identifica al producto a eliminar.
+ * @param {import('express').Response} res - Responde 204 sin contenido o 404 si el producto no existe.
+ * @returns {Promise<void>}
+ */
 productsRouter.delete('/:id', adminOnly, asyncHandler(async (req, res) => {
   const deleted = await Producto.destroy({ where: { id: req.params.id } });
   if (!deleted) {
@@ -167,6 +216,13 @@ productsRouter.delete('/:id', adminOnly, asyncHandler(async (req, res) => {
   res.status(204).end();
 }));
 
+/**
+ * GET /api/products/variants - Lista todas las variantes con su producto e inventario, ordenadas por nombre, color y talla.
+ *
+ * @param {import('express').Request} _req - No utiliza datos de la peticion.
+ * @param {import('express').Response} res - Responde 200 con el arreglo de variantes formateadas.
+ * @returns {Promise<void>}
+ */
 productsRouter.get('/variants', asyncHandler(async (_req, res) => {
   const variants = await ProductoVariante.findAll({
     include: [
@@ -182,6 +238,14 @@ productsRouter.get('/variants', asyncHandler(async (_req, res) => {
   res.json(variants.map(formatVariant));
 }));
 
+/**
+ * POST /api/products/:id/variants - Crea una variante de un producto e inicializa su inventario. Requiere rol admin.
+ * Crea la variante y su registro de inventario dentro de una misma transaccion.
+ *
+ * @param {import('express').Request} req - req.params.id identifica al producto; req.body con { color, talla, cantidad }.
+ * @param {import('express').Response} res - Responde 201 con la variante creada y su cantidad inicial.
+ * @returns {Promise<void>}
+ */
 productsRouter.post('/:id/variants', adminOnly, asyncHandler(async (req, res) => {
   const { color, talla, cantidad } = req.body;
 

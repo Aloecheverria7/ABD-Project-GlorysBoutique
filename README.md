@@ -51,6 +51,9 @@ Main endpoints:
 - `POST /api/products/:id/variants`
 - `GET|PUT /api/inventory`
 - `GET|POST /api/sales`
+- `GET /api/caja` y `POST|DELETE /api/caja/movimientos`
+
+Cuentas iniciales (contrasena `123`): `admin1`, `admin2`, `admin3` y `dueno` (admin); `empleado` (vendedor).
 
 ## Frontend
 

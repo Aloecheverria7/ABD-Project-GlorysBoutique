@@ -1,6 +1,13 @@
+/** @file Utilidades para generar e imprimir el recibo de venta en formato ticket (80mm). */
 import { DEFAULT_RATE } from '../constants.js';
 import { fmt } from './format.js';
 
+/**
+ * Escapa caracteres especiales de HTML para insertar texto de forma segura en el recibo.
+ *
+ * @param {*} value - Valor a escapar (se convierte a cadena; los nulos quedan vacios).
+ * @returns {string} Texto con los caracteres &, <, > y " escapados.
+ */
 function escapeHTML(value) {
   return String(value ?? '')
     .replace(/&/g, '&amp;')
@@ -9,6 +16,23 @@ function escapeHTML(value) {
     .replace(/"/g, '&quot;');
 }
 
+/**
+ * Construye el documento HTML completo del recibo de una venta.
+ * Calcula el equivalente en la moneda alterna usando la tasa de cambio, lista los
+ * items con sus subtotales e incluye un script que imprime y cierra la ventana al cargar.
+ *
+ * @param {Object} sale - Venta a imprimir.
+ * @param {number|string} sale.id - Folio de la venta.
+ * @param {string} [sale.moneda] - Moneda de la venta ('NIO' o 'USD'); por defecto 'NIO'.
+ * @param {number|string} [sale.tasa_cambio] - Tasa de cambio aplicada; usa DEFAULT_RATE si falta.
+ * @param {number|string} sale.total - Total de la venta en la moneda de la venta.
+ * @param {Array<{producto: string, color?: string, talla?: string, cantidad: number|string, precio_unitario: number|string}>} sale.items - Lineas de la venta.
+ * @param {string} [sale.fecha] - Fecha de la venta; si falta se usa la fecha actual.
+ * @param {string} [sale.cajero] - Nombre del cajero.
+ * @param {string} [sale.cliente] - Nombre del cliente.
+ * @param {string} [sale.tipo_pago] - Tipo de pago utilizado.
+ * @returns {string} Documento HTML del recibo listo para escribir en una ventana.
+ */
 function buildReceiptHTML(sale) {
   const moneda = sale.moneda || 'NIO';
   const rate = Number(sale.tasa_cambio || DEFAULT_RATE);
@@ -120,6 +144,12 @@ function buildReceiptHTML(sale) {
 </html>`;
 }
 
+/**
+ * Abre una ventana emergente con el recibo de la venta para su impresion.
+ * Si el navegador bloquea las ventanas emergentes, muestra una alerta al usuario.
+ *
+ * @param {Object} sale - Venta a imprimir (ver buildReceiptHTML para la forma esperada).
+ */
 export function printReceipt(sale) {
   const win = window.open('', '_blank', 'width=360,height=640');
   if (!win) {

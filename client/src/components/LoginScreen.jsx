@@ -1,12 +1,27 @@
+/** @file Componente LoginScreen: pantalla de inicio de sesion del sistema. */
 import React, { useState } from 'react';
 import { Logo } from './Logo.jsx';
 import { Field } from './Field.jsx';
 
+/**
+ * Pantalla de inicio de sesion. Recoge usuario y contrasena y delega la autenticacion en onLogin.
+ *
+ * @param {Object} props
+ * @param {(username: string, password: string) => Promise<void>} props.onLogin - Callback que autentica al usuario.
+ * @returns {JSX.Element}
+ */
 export function LoginScreen({ onLogin }) {
   const [form, setForm] = useState({ username: '', password: '' });
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
+  /**
+   * Maneja el envio del formulario: previene el comportamiento por defecto,
+   * limpia errores, marca el estado de envio y delega la autenticacion en onLogin.
+   *
+   * @param {React.FormEvent<HTMLFormElement>} event - Evento de envio del formulario.
+   * @returns {Promise<void>}
+   */
   async function submit(event) {
     event.preventDefault();
     setError('');
@@ -50,9 +65,6 @@ export function LoginScreen({ onLogin }) {
         <button type="submit" disabled={submitting}>
           {submitting ? 'Validando...' : 'Entrar'}
         </button>
-        <p className="login-hint">
-          Cuentas demo: <code>admin / 123</code> y <code>user1 / 123</code>
-        </p>
       </form>
     </div>
   );

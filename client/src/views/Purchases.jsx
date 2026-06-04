@@ -1,3 +1,8 @@
+/**
+ * @file Vista de registro de compras a proveedores. Permite armar un carrito de
+ * variantes, capturar su costo unitario por moneda y registrar la compra para
+ * sumar el inventario.
+ */
 import React, { useMemo, useState } from 'react';
 import { Minus, Plus, ShoppingBag, Trash2 } from 'lucide-react';
 import { Field } from '../components/Field.jsx';
@@ -5,6 +10,17 @@ import { api } from '../api.js';
 import { fmt } from '../utils/format.js';
 import { DEFAULT_RATE } from '../constants.js';
 
+/**
+ * Vista de nueva compra: selecciona un proveedor, filtra sus variantes,
+ * arma un carrito con costos unitarios y registra la compra sumando inventario.
+ *
+ * @param {Object} props
+ * @param {Array<Object>} props.variants - Variantes de producto disponibles para comprar.
+ * @param {Array<Object>} props.suppliers - Proveedores con sus productos vinculados.
+ * @param {{ tasa_cambio_usd?: number }} props.config - Configuracion del negocio, incluye la tasa de cambio USD.
+ * @param {() => void} props.reload - Recarga los datos tras registrar la compra.
+ * @returns {JSX.Element}
+ */
 export function Purchases({ variants, suppliers, config, reload }) {
   const [proveedorId, setProveedorId] = useState('');
   const [moneda, setMoneda] = useState('NIO');
@@ -44,6 +60,13 @@ export function Purchases({ variants, suppliers, config, reload }) {
     });
   }, [variants, search, supplierProductIds]);
 
+  /**
+   * Calcula el costo de referencia de una variante segun el proveedor, convertido
+   * a la moneda activa cuando difiere de la moneda registrada en el vinculo.
+   *
+   * @param {Object} variant - Variante de producto.
+   * @returns {number} Costo de referencia en la moneda seleccionada.
+   */
   function defaultCostFor(variant) {
     const link = supplierCostByProduct.get(variant.producto_id);
     if (!link || link.costo == null) return 0;
@@ -53,6 +76,12 @@ export function Purchases({ variants, suppliers, config, reload }) {
     return Number(link.costo);
   }
 
+  /**
+   * Agrega una variante al carrito; si ya existe incrementa su cantidad en uno.
+   *
+   * @param {Object} variant - Variante a agregar.
+   * @returns {void}
+   */
   function addToCart(variant) {
     setCart((current) => {
       const existing = current.find((item) => item.producto_variante_id === variant.id);
@@ -74,6 +103,14 @@ export function Purchases({ variants, suppliers, config, reload }) {
     });
   }
 
+  /**
+   * Modifica la cantidad de una variante en el carrito; si llega a cero o menos
+   * la elimina del carrito.
+   *
+   * @param {number} variantId - Identificador de la variante en el carrito.
+   * @param {number} delta - Variacion a aplicar a la cantidad (positiva o negativa).
+   * @returns {void}
+   */
   function changeQty(variantId, delta) {
     setCart((current) => current
       .map((item) => {
@@ -86,6 +123,13 @@ export function Purchases({ variants, suppliers, config, reload }) {
     );
   }
 
+  /**
+   * Establece el costo unitario de una variante en el carrito.
+   *
+   * @param {number} variantId - Identificador de la variante en el carrito.
+   * @param {string} value - Valor capturado; vacio se interpreta como cero.
+   * @returns {void}
+   */
   function setUnitCost(variantId, value) {
     setCart((current) => current.map((item) =>
       item.producto_variante_id === variantId
@@ -94,6 +138,12 @@ export function Purchases({ variants, suppliers, config, reload }) {
     ));
   }
 
+  /**
+   * Quita por completo una variante del carrito.
+   *
+   * @param {number} variantId - Identificador de la variante a quitar.
+   * @returns {void}
+   */
   function removeFromCart(variantId) {
     setCart((current) => current.filter((item) => item.producto_variante_id !== variantId));
   }
@@ -103,12 +153,24 @@ export function Purchases({ variants, suppliers, config, reload }) {
     [cart]
   );
 
+  /**
+   * Restablece el carrito, las notas y la busqueda tras registrar una compra.
+   *
+   * @returns {void}
+   */
   function resetForm() {
     setCart([]);
     setNotas('');
     setSearch('');
   }
 
+  /**
+   * Valida y envia la compra al servidor con el proveedor, moneda, notas e items
+   * del carrito; al exito muestra el folio, limpia el formulario y recarga.
+   *
+   * @param {Event} event - Evento de envio del formulario.
+   * @returns {Promise<void>}
+   */
   async function submit(event) {
     event.preventDefault();
     setError('');

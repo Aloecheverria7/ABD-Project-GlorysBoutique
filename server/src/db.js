@@ -1,3 +1,7 @@
+/**
+ * @file Configuracion e instancia de conexion Sequelize a la base de datos MySQL.
+ * Lee las credenciales y opciones desde las variables de entorno y exporta la instancia compartida.
+ */
 import dotenv from 'dotenv';
 import { Sequelize } from 'sequelize';
 

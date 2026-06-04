@@ -1,3 +1,4 @@
+/** @file Rutas de usuarios: administracion de cuentas (alta, edicion, baja logica) restringida al rol admin. */
 import bcrypt from 'bcryptjs';
 import { Router } from 'express';
 import { Role, Usuario } from '../models/index.js';
@@ -9,6 +10,13 @@ export const usersRouter = Router();
 usersRouter.use(requireAuth);
 const adminOnly = requireRole('admin');
 
+/**
+ * Devuelve la representacion publica de un usuario, omitiendo datos sensibles como la contrasena.
+ * Resuelve el nombre del rol desde la relacion Role incluida.
+ *
+ * @param {import('sequelize').Model} usuario - Instancia Sequelize de Usuario con la relacion Role.
+ * @returns {{ id: number, username: string, rol_id: number, rol: (string|null), activo: boolean }} Usuario publico.
+ */
 function publicUser(usuario) {
   return {
     id: usuario.id,
@@ -19,6 +27,14 @@ function publicUser(usuario) {
   };
 }
 
+/**
+ * GET /api/users - Lista todos los usuarios ordenados por nombre de usuario, con su rol.
+ * Solo accesible para el rol admin.
+ *
+ * @param {import('express').Request} _req - Peticion HTTP (no usa parametros).
+ * @param {import('express').Response} res - Responde con un arreglo de usuarios publicos.
+ * @returns {Promise<void>}
+ */
 usersRouter.get('/', adminOnly, asyncHandler(async (_req, res) => {
   const users = await Usuario.findAll({
     include: [{ model: Role, attributes: ['id', 'nombre'] }],
@@ -27,6 +43,17 @@ usersRouter.get('/', adminOnly, asyncHandler(async (_req, res) => {
   res.json(users.map(publicUser));
 }));
 
+/**
+ * POST /api/users - Crea un usuario con la contrasena cifrada mediante bcrypt.
+ * Solo accesible para el rol admin. Valida que el usuario, la contrasena (minimo 3 caracteres)
+ * y el rol esten presentes, y que el nombre de usuario no exista ya.
+ *
+ * @param {import('express').Request} req - Peticion HTTP. Usa req.body: { username, password, rol_id, activo }.
+ *   activo es opcional (por defecto true salvo que sea exactamente false).
+ * @param {import('express').Response} res - Responde 201 con el usuario publico;
+ *   400 si falta usuario, la contrasena es corta, falta rol o el usuario ya existe.
+ * @returns {Promise<void>}
+ */
 usersRouter.post('/', adminOnly, asyncHandler(async (req, res) => {
   const { username, password, rol_id, activo } = req.body;
   if (!username || !String(username).trim()) {
@@ -59,6 +86,17 @@ usersRouter.post('/', adminOnly, asyncHandler(async (req, res) => {
   sendCreated(res, publicUser(refreshed));
 }));
 
+/**
+ * PUT /api/users/:id - Actualiza parcialmente un usuario (nombre, contrasena, rol o estado activo).
+ * Solo accesible para el rol admin. Solo se modifican los campos enviados. Si se envia contrasena no vacia,
+ * se cifra con bcrypt (minimo 3 caracteres). Valida que el nuevo nombre de usuario no este vacio ni tomado por otro.
+ *
+ * @param {import('express').Request} req - Peticion HTTP. Usa req.params.id y req.body:
+ *   { username, password, rol_id, activo } (todos opcionales).
+ * @param {import('express').Response} res - Responde con el usuario publico actualizado;
+ *   404 si el usuario no existe; 400 si el nombre queda vacio, esta tomado o la contrasena es corta.
+ * @returns {Promise<void>}
+ */
 usersRouter.put('/:id', adminOnly, asyncHandler(async (req, res) => {
   const user = await Usuario.findByPk(req.params.id);
   if (!user) {
@@ -100,6 +138,15 @@ usersRouter.put('/:id', adminOnly, asyncHandler(async (req, res) => {
   res.json(publicUser(refreshed));
 }));
 
+/**
+ * DELETE /api/users/:id - Realiza una baja logica del usuario marcandolo como inactivo (activo = false).
+ * Solo accesible para el rol admin. No permite que el usuario autenticado se elimine a si mismo.
+ *
+ * @param {import('express').Request} req - Peticion HTTP. Usa req.params.id (id objetivo) y req.user.id (usuario autenticado).
+ * @param {import('express').Response} res - Responde con { id, activo: false };
+ *   400 si se intenta eliminar el propio usuario; 404 si el usuario no existe.
+ * @returns {Promise<void>}
+ */
 usersRouter.delete('/:id', adminOnly, asyncHandler(async (req, res) => {
   const target = Number(req.params.id);
   if (target === req.user.id) {
