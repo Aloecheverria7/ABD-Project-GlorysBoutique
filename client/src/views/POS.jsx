@@ -1,3 +1,4 @@
+/** @file Vista de punto de venta (POS) para armar el carrito, seleccionar cliente y tipo de pago, cobrar e imprimir el recibo. */
 import React, { useMemo, useState } from 'react';
 import { Minus, Plus, Printer, ScanLine, ShoppingCart, Trash2 } from 'lucide-react';
 import { Field } from '../components/Field.jsx';
@@ -6,6 +7,20 @@ import { fmt, priceFor } from '../utils/format.js';
 import { printReceipt } from '../utils/receipt.js';
 import { DEFAULT_RATE } from '../constants.js';
 
+/**
+ * Vista de punto de venta que permite buscar variantes de producto, agregarlas a un
+ * carrito, elegir moneda (NIO o USD), seleccionar cliente ocasional o registrado,
+ * definir el tipo de pago y finalizar la venta imprimiendo el recibo.
+ *
+ * @param {Object} props
+ * @param {Array<Object>} props.variants - Variantes de producto disponibles con precio y stock.
+ * @param {Array<Object>} props.customers - Clientes registrados para asociar a la venta.
+ * @param {{ tiposPago: Array<{ id: number, nombre: string, es_credito: boolean }> }} props.lookups - Catalogos auxiliares, incluye los tipos de pago.
+ * @param {{ tasa_cambio_usd: number }} props.config - Configuracion del sistema, aporta la tasa de cambio USD.
+ * @param {{ username: string, rol: string }} props.user - Usuario en sesion (cajero que realiza la venta).
+ * @param {Function} props.reload - Funcion que recarga los datos tras concretar la venta.
+ * @returns {JSX.Element}
+ */
 export function POS({ variants, customers, lookups, config, user, reload }) {
   const [search, setSearch] = useState('');
   const [cart, setCart] = useState([]);
@@ -48,6 +63,13 @@ export function POS({ variants, customers, lookups, config, user, reload }) {
     [cartView]
   );
 
+  /**
+   * Agrega una variante al carrito. Si ya existe incrementa su cantidad respetando
+   * el stock disponible; ignora las variantes sin existencias.
+   *
+   * @param {Object} variant - Variante de producto seleccionada.
+   * @returns {void}
+   */
   function addToCart(variant) {
     if (Number(variant.cantidad) <= 0) return;
     setCart((current) => {
@@ -71,6 +93,14 @@ export function POS({ variants, customers, lookups, config, user, reload }) {
     });
   }
 
+  /**
+   * Modifica la cantidad de un articulo del carrito. Elimina la linea si la cantidad
+   * llega a cero o menos y no permite superar el stock disponible.
+   *
+   * @param {number} variantId - Identificador de la variante a modificar.
+   * @param {number} delta - Cambio a aplicar a la cantidad (positivo o negativo).
+   * @returns {void}
+   */
   function changeQty(variantId, delta) {
     setCart((current) => current
       .map((item) => {
@@ -84,10 +114,22 @@ export function POS({ variants, customers, lookups, config, user, reload }) {
     );
   }
 
+  /**
+   * Quita por completo una variante del carrito.
+   *
+   * @param {number} variantId - Identificador de la variante a quitar.
+   * @returns {void}
+   */
   function removeFromCart(variantId) {
     setCart((current) => current.filter((item) => item.producto_variante_id !== variantId));
   }
 
+  /**
+   * Reinicia el formulario de venta dejando el carrito vacio y los campos en su
+   * valor por defecto.
+   *
+   * @returns {void}
+   */
   function resetForm() {
     setCart([]);
     setClienteId('');
@@ -98,6 +140,14 @@ export function POS({ variants, customers, lookups, config, user, reload }) {
     setMoneda('NIO');
   }
 
+  /**
+   * Valida el carrito y los datos del cliente, envia la venta al servidor, imprime
+   * el recibo y reinicia el formulario. Las ventas a credito exigen un cliente
+   * registrado.
+   *
+   * @param {React.FormEvent} event - Evento de envio del formulario.
+   * @returns {Promise<void>}
+   */
   async function checkout(event) {
     event.preventDefault();
     setError('');

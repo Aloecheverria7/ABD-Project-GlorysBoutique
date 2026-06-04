@@ -1,3 +1,7 @@
+/**
+ * @file Vista de tipos de pago. Permite crear, editar y eliminar las formas de
+ * pago aceptadas, incluyendo si un tipo es de credito (fiado).
+ */
 import React, { useState } from 'react';
 import { Pencil, Tags, Trash2, X } from 'lucide-react';
 import { Field } from '../components/Field.jsx';
@@ -5,23 +9,50 @@ import { api } from '../api.js';
 
 const emptyForm = { nombre: '', es_credito: false };
 
+/**
+ * Vista de tipos de pago: administra las formas de pago del negocio y marca
+ * cuales son de credito (fiado) para generar saldo en lugar de cobro inmediato.
+ *
+ * @param {Object} props
+ * @param {Array<Object>} props.paymentTypes - Lista de tipos de pago registrados.
+ * @param {() => void} props.reload - Recarga los datos tras una operacion.
+ * @returns {JSX.Element}
+ */
 export function PaymentTypes({ paymentTypes, reload }) {
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState(null);
   const [error, setError] = useState('');
 
+  /**
+   * Carga en el formulario los datos del tipo de pago seleccionado para editarlo.
+   *
+   * @param {Object} type - Tipo de pago a editar.
+   * @returns {void}
+   */
   function startEdit(type) {
     setEditingId(type.id);
     setForm({ nombre: type.nombre, es_credito: !!type.es_credito });
     setError('');
   }
 
+  /**
+   * Cancela la edicion en curso y restablece el formulario a su estado vacio.
+   *
+   * @returns {void}
+   */
   function cancelEdit() {
     setEditingId(null);
     setForm(emptyForm);
     setError('');
   }
 
+  /**
+   * Envia el formulario para crear o actualizar un tipo de pago. En edicion hace
+   * PUT y en alta hace POST.
+   *
+   * @param {Event} event - Evento de envio del formulario.
+   * @returns {Promise<void>}
+   */
   async function submit(event) {
     event.preventDefault();
     setError('');
@@ -38,6 +69,13 @@ export function PaymentTypes({ paymentTypes, reload }) {
     }
   }
 
+  /**
+   * Elimina un tipo de pago previa confirmacion. Si se estaba editando ese mismo
+   * tipo, cancela la edicion.
+   *
+   * @param {number} id - Identificador del tipo de pago a eliminar.
+   * @returns {Promise<void>}
+   */
   async function remove(id) {
     if (!confirm('Eliminar este tipo de pago?')) return;
     try {

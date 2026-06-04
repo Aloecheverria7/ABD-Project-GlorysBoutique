@@ -1,10 +1,14 @@
+/**
+ * @file Configuracion e instancia de conexion Sequelize a la base de datos MySQL.
+ * Lee las credenciales y opciones desde las variables de entorno y exporta la instancia compartida.
+ */
 import dotenv from 'dotenv';
 import { Sequelize } from 'sequelize';
 
 dotenv.config();
 
 export const sequelize = new Sequelize(
-  process.env.DB_NAME || 'glorysboutique_BD',
+  process.env.DB_NAME || 'glorysboutique_bd',
   process.env.DB_USER || 'root',
   process.env.DB_PASSWORD || '',
   {

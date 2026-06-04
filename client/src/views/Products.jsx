@@ -1,3 +1,4 @@
+/** @file Vista de gestion de productos: alta, edicion, eliminacion, precios en NIO/USD y vinculo con proveedores. */
 import React, { useState } from 'react';
 import { PackagePlus, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { Field } from '../components/Field.jsx';
@@ -15,24 +16,60 @@ const emptyForm = {
 
 const emptyLink = { proveedor_id: '', costo: '', moneda_costo: 'NIO' };
 
+/**
+ * Vista de gestion de productos que permite crear, editar y eliminar productos con
+ * precio fijo en cordobas, en dolares o ambos, asociar uno o varios proveedores con
+ * su costo, y listar los productos existentes.
+ *
+ * @param {Object} props
+ * @param {Array<Object>} props.products - Lista de productos a mostrar.
+ * @param {Array<Object>} [props.suppliers] - Proveedores disponibles para vincular; si esta vacio se usan los del catalogo de lookups.
+ * @param {{ categorias: Array<{ id: number, nombre: string }>, subcategorias: Array<{ id: number, nombre: string }>, proveedores: Array<{ id: number, nombre: string }> }} props.lookups - Catalogos auxiliares de categorias, subcategorias y proveedores.
+ * @param {Function} props.reload - Funcion que recarga los datos tras una operacion.
+ * @returns {JSX.Element}
+ */
 export function Products({ products, suppliers = [], lookups, reload }) {
   const [form, setForm] = useState(emptyForm);
   const [supplierLinks, setSupplierLinks] = useState([]);
   const [editingId, setEditingId] = useState(null);
   const [error, setError] = useState('');
 
+  /**
+   * Agrega una fila vacia para vincular un nuevo proveedor al producto.
+   *
+   * @returns {void}
+   */
   function addSupplierRow() {
     setSupplierLinks((current) => [...current, { ...emptyLink }]);
   }
 
+  /**
+   * Actualiza los campos de una fila de proveedor en el indice indicado.
+   *
+   * @param {number} index - Posicion de la fila a modificar.
+   * @param {Object} patch - Campos a fusionar en la fila.
+   * @returns {void}
+   */
   function updateSupplierRow(index, patch) {
     setSupplierLinks((current) => current.map((row, idx) => (idx === index ? { ...row, ...patch } : row)));
   }
 
+  /**
+   * Elimina la fila de proveedor ubicada en el indice indicado.
+   *
+   * @param {number} index - Posicion de la fila a eliminar.
+   * @returns {void}
+   */
   function removeSupplierRow(index) {
     setSupplierLinks((current) => current.filter((_, idx) => idx !== index));
   }
 
+  /**
+   * Carga los datos de un producto y sus proveedores en el formulario para editarlo.
+   *
+   * @param {Object} product - Producto seleccionado para editar.
+   * @returns {void}
+   */
   function startEdit(product) {
     setEditingId(product.id);
     setForm({
@@ -51,6 +88,12 @@ export function Products({ products, suppliers = [], lookups, reload }) {
     setError('');
   }
 
+  /**
+   * Cancela la edicion en curso y restablece el formulario y los proveedores a su
+   * estado inicial.
+   *
+   * @returns {void}
+   */
   function cancelEdit() {
     setEditingId(null);
     setForm(emptyForm);
@@ -58,6 +101,13 @@ export function Products({ products, suppliers = [], lookups, reload }) {
     setError('');
   }
 
+  /**
+   * Valida que exista al menos un precio, normaliza los proveedores y precios, y envia
+   * el formulario para crear o actualizar el producto, recargando los datos al finalizar.
+   *
+   * @param {React.FormEvent} event - Evento de envio del formulario.
+   * @returns {Promise<void>}
+   */
   async function submit(event) {
     event.preventDefault();
     setError('');
@@ -93,6 +143,13 @@ export function Products({ products, suppliers = [], lookups, reload }) {
     }
   }
 
+  /**
+   * Solicita confirmacion y elimina un producto junto con sus variantes e inventario;
+   * si estaba en edicion cancela el formulario y recarga los datos.
+   *
+   * @param {number} id - Identificador del producto a eliminar.
+   * @returns {Promise<void>}
+   */
   async function removeProduct(id) {
     if (!confirm('Eliminar este producto? Sus variantes e inventario tambien se eliminaran.')) return;
     try {

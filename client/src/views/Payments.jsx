@@ -1,3 +1,7 @@
+/**
+ * @file Vista de abonos a cuenta. Registra pagos parciales o totales de clientes
+ * con saldo pendiente y muestra su saldo e historial de movimientos.
+ */
 import React, { useEffect, useMemo, useState } from 'react';
 import { HandCoins } from 'lucide-react';
 import { Field } from '../components/Field.jsx';
@@ -6,6 +10,18 @@ import { fmt } from '../utils/format.js';
 
 const emptyForm = { cliente_id: '', tipo_pago_id: '', monto: '', moneda: 'NIO', notas: '' };
 
+/**
+ * Vista de abonos: registra pagos de clientes con saldo y permite filtrar el
+ * historial por cliente mostrando su saldo en NIO y USD. Excluye los tipos de
+ * pago marcados como credito.
+ *
+ * @param {Object} props
+ * @param {Array<Object>} props.abonos - Historial de abonos registrados.
+ * @param {Array<Object>} props.customers - Clientes con sus saldos pendientes en NIO y USD.
+ * @param {Array<Object>} props.paymentTypes - Tipos de pago; los de credito se omiten en esta vista.
+ * @param {() => void} props.reload - Recarga los datos tras registrar un abono.
+ * @returns {JSX.Element}
+ */
 export function Payments({ abonos, customers, paymentTypes, reload }) {
   const [form, setForm] = useState(emptyForm);
   const [filterCliente, setFilterCliente] = useState('');
@@ -41,6 +57,13 @@ export function Payments({ abonos, customers, paymentTypes, reload }) {
     return () => { cancelled = true; };
   }, [filterCliente]);
 
+  /**
+   * Envia el formulario para registrar un abono del cliente seleccionado; al
+   * exito muestra el saldo resultante, limpia el monto y recarga los datos.
+   *
+   * @param {Event} event - Evento de envio del formulario.
+   * @returns {Promise<void>}
+   */
   async function submit(event) {
     event.preventDefault();
     setError('');

@@ -1,3 +1,8 @@
+/**
+ * @file Punto de entrada del servidor Express de la API de Glorys Boutique.
+ * Configura middlewares de seguridad, CORS, parseo JSON y logging, registra los routers de la API,
+ * define el manejo de 404 y errores, ejecuta la migracion opcional y arranca el servidor HTTP.
+ */
 import cors from 'cors';
 import dotenv from 'dotenv';
 import express from 'express';
@@ -6,6 +11,7 @@ import morgan from 'morgan';
 import { sequelize } from './db.js';
 import { migrateDatabase } from './database/migrate.js';
 import { authRouter } from './routes/auth.js';
+import { cajaRouter } from './routes/caja.js';
 import { catalogRouter } from './routes/catalog.js';
 import { configRouter } from './routes/config.js';
 import { customersRouter } from './routes/customers.js';
@@ -49,6 +55,7 @@ app.use('/api/purchases', purchasesRouter);
 app.use('/api/users', usersRouter);
 app.use('/api/payment-types', paymentTypesRouter);
 app.use('/api/payments', paymentsRouter);
+app.use('/api/caja', cajaRouter);
 
 app.use((req, res) => {
   res.status(404).json({ message: `Route not found: ${req.method} ${req.originalUrl}` });

@@ -1,3 +1,7 @@
+/**
+ * @file Vista de administracion de usuarios del sistema. Permite crear, editar
+ * y desactivar usuarios; modulo restringido a administradores.
+ */
 import React, { useState } from 'react';
 import { Pencil, Trash2, UserCog, X } from 'lucide-react';
 import { Field } from '../components/Field.jsx';
@@ -5,6 +9,16 @@ import { api } from '../api.js';
 
 const emptyForm = { username: '', password: '', rol_id: '', activo: true };
 
+/**
+ * Vista de usuarios: administra las cuentas del sistema con su rol y estado.
+ *
+ * @param {Object} props
+ * @param {Array<Object>} props.users - Lista de usuarios registrados.
+ * @param {{ roles?: Array<Object> }} props.lookups - Catalogos de apoyo; provee los roles disponibles.
+ * @param {{ id: number }} props.currentUser - Usuario en sesion; no puede desactivarse a si mismo.
+ * @param {() => void} props.reload - Recarga los datos tras una operacion.
+ * @returns {JSX.Element}
+ */
 export function UsersView({ users, lookups, currentUser, reload }) {
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState(null);
@@ -13,6 +27,13 @@ export function UsersView({ users, lookups, currentUser, reload }) {
 
   const roles = lookups?.roles || null;
 
+  /**
+   * Carga en el formulario los datos del usuario seleccionado para editarlo;
+   * deja la contrasena vacia para no cambiarla.
+   *
+   * @param {Object} user - Usuario a editar.
+   * @returns {void}
+   */
   function startEdit(user) {
     setEditingId(user.id);
     setForm({
@@ -25,6 +46,11 @@ export function UsersView({ users, lookups, currentUser, reload }) {
     setMessage('');
   }
 
+  /**
+   * Cancela la edicion en curso y restablece el formulario a su estado vacio.
+   *
+   * @returns {void}
+   */
   function cancelEdit() {
     setEditingId(null);
     setForm(emptyForm);
@@ -32,6 +58,13 @@ export function UsersView({ users, lookups, currentUser, reload }) {
     setMessage('');
   }
 
+  /**
+   * Envia el formulario para crear o actualizar un usuario. En alta exige la
+   * contrasena; en edicion solo la envia si se capturo una nueva.
+   *
+   * @param {Event} event - Evento de envio del formulario.
+   * @returns {Promise<void>}
+   */
   async function submit(event) {
     event.preventDefault();
     setError('');
@@ -63,6 +96,13 @@ export function UsersView({ users, lookups, currentUser, reload }) {
     }
   }
 
+  /**
+   * Desactiva un usuario previa confirmacion; impide que el usuario en sesion
+   * se desactive a si mismo.
+   *
+   * @param {Object} user - Usuario a desactivar.
+   * @returns {Promise<void>}
+   */
   async function disableUser(user) {
     if (user.id === currentUser.id) {
       alert('No puedes desactivar tu propio usuario.');

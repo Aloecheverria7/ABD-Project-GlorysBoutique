@@ -1,9 +1,20 @@
+/** @file Vista de panel principal (dashboard) con estadisticas generales y ventas recientes. */
 import React from 'react';
 import { Boxes, CreditCard, ShoppingBag, Users } from 'lucide-react';
 import { Stat } from '../components/Stat.jsx';
 import { fmt } from '../utils/format.js';
 import { DEFAULT_RATE } from '../constants.js';
 
+/**
+ * Vista de panel principal que muestra tarjetas con metricas (productos, clientes,
+ * stock bajo, ingresos en NIO) y una tabla con las ventas recientes. Algunas metricas
+ * solo se muestran para usuarios con rol de administrador.
+ *
+ * @param {Object} props
+ * @param {{ inventory: Array<Object>, sales: Array<Object>, products: Array<Object>, customers: Array<Object> }} props.data - Datos agregados del sistema usados para calcular las metricas y listar ventas.
+ * @param {{ username: string, rol: string }} props.user - Usuario en sesion; su rol determina que metricas se muestran.
+ * @returns {JSX.Element}
+ */
 export function Dashboard({ data, user }) {
   const lowStock = data.inventory.filter((item) => item.cantidad <= 5).length;
   const revenueNIO = data.sales.reduce((sum, sale) => {

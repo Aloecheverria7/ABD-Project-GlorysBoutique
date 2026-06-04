@@ -1,13 +1,31 @@
+/**
+ * @file Vista de historial de compras. Lista las compras registradas y permite
+ * abrir el detalle de cada una con sus items.
+ */
 import React, { useState } from 'react';
 import { CreditCard, Eye } from 'lucide-react';
 import { api } from '../api.js';
 import { fmt } from '../utils/format.js';
 
+/**
+ * Vista de historial de compras: muestra la tabla de compras y, al seleccionar
+ * una, despliega su detalle con los productos comprados.
+ *
+ * @param {Object} props
+ * @param {Array<Object>} props.purchases - Lista de compras registradas.
+ * @returns {JSX.Element}
+ */
 export function PurchaseHistory({ purchases }) {
   const [selected, setSelected] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  /**
+   * Solicita al servidor el detalle de una compra y lo guarda para mostrarlo.
+   *
+   * @param {number} id - Identificador de la compra a consultar.
+   * @returns {Promise<void>}
+   */
   async function openDetail(id) {
     setLoading(true);
     setError('');

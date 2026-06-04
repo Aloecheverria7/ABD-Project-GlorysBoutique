@@ -1,3 +1,7 @@
+/**
+ * @file Vista de proveedores. Permite crear, editar y eliminar proveedores y
+ * vincular los productos que entregan, con costo y moneda opcionales por producto.
+ */
 import React, { useState } from 'react';
 import { Plus, Trash2, Truck, Pencil, X } from 'lucide-react';
 import { Field } from '../components/Field.jsx';
@@ -7,12 +11,29 @@ import { fmt } from '../utils/format.js';
 const emptyForm = { nombre: '', telefono: '', direccion: '' };
 const emptyLink = { producto_id: '', costo: '', moneda_costo: 'NIO' };
 
+/**
+ * Vista de proveedores: registra y administra proveedores junto con los
+ * productos que les corresponden, incluyendo costo y moneda por producto.
+ *
+ * @param {Object} props
+ * @param {Array<Object>} props.suppliers - Lista de proveedores con su arreglo de productos vinculados.
+ * @param {Array<Object>} props.products - Catalogo de productos disponibles para asignar a un proveedor.
+ * @param {() => void} props.reload - Recarga los datos del panel tras una operacion.
+ * @returns {JSX.Element}
+ */
 export function Suppliers({ suppliers, products, reload }) {
   const [form, setForm] = useState(emptyForm);
   const [productLinks, setProductLinks] = useState([]);
   const [editingId, setEditingId] = useState(null);
   const [error, setError] = useState('');
 
+  /**
+   * Carga en el formulario los datos del proveedor seleccionado para editarlo,
+   * incluyendo sus productos vinculados.
+   *
+   * @param {Object} supplier - Proveedor a editar.
+   * @returns {void}
+   */
   function startEdit(supplier) {
     setEditingId(supplier.id);
     setForm({
@@ -28,6 +49,11 @@ export function Suppliers({ suppliers, products, reload }) {
     setError('');
   }
 
+  /**
+   * Cancela la edicion en curso y restablece el formulario a su estado vacio.
+   *
+   * @returns {void}
+   */
   function cancelEdit() {
     setEditingId(null);
     setForm(emptyForm);
@@ -35,16 +61,41 @@ export function Suppliers({ suppliers, products, reload }) {
     setError('');
   }
 
+  /**
+   * Agrega una fila vacia de vinculo de producto al formulario.
+   *
+   * @returns {void}
+   */
   function addLink() {
     setProductLinks((current) => [...current, { ...emptyLink }]);
   }
+  /**
+   * Actualiza una fila de vinculo de producto con los campos indicados.
+   *
+   * @param {number} index - Indice de la fila a modificar.
+   * @param {Object} patch - Campos a fusionar en la fila.
+   * @returns {void}
+   */
   function updateLink(index, patch) {
     setProductLinks((current) => current.map((row, idx) => (idx === index ? { ...row, ...patch } : row)));
   }
+  /**
+   * Elimina la fila de vinculo de producto en el indice indicado.
+   *
+   * @param {number} index - Indice de la fila a quitar.
+   * @returns {void}
+   */
   function removeLink(index) {
     setProductLinks((current) => current.filter((_, idx) => idx !== index));
   }
 
+  /**
+   * Envia el formulario para crear o actualizar un proveedor con sus productos
+   * vinculados. En edicion hace PUT y en alta hace POST.
+   *
+   * @param {Event} event - Evento de envio del formulario.
+   * @returns {Promise<void>}
+   */
   async function submit(event) {
     event.preventDefault();
     setError('');
@@ -74,6 +125,13 @@ export function Suppliers({ suppliers, products, reload }) {
     }
   }
 
+  /**
+   * Elimina un proveedor previa confirmacion. Si se estaba editando ese mismo
+   * proveedor, cancela la edicion.
+   *
+   * @param {number} id - Identificador del proveedor a eliminar.
+   * @returns {Promise<void>}
+   */
   async function removeSupplier(id) {
     if (!confirm('Eliminar este proveedor? Sus productos quedaran sin vinculo.')) return;
     try {

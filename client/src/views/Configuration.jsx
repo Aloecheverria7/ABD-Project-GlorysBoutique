@@ -1,3 +1,4 @@
+/** @file Vista de configuracion del sistema: tasa de cambio USD y monto de caja base. */
 import React, { useEffect, useState } from 'react';
 import { Settings } from 'lucide-react';
 import { Field } from '../components/Field.jsx';
@@ -5,8 +6,19 @@ import { api } from '../api.js';
 import { fmt } from '../utils/format.js';
 import { DEFAULT_RATE } from '../constants.js';
 
+/**
+ * Vista de configuracion del sistema que permite editar la tasa de cambio de cordobas
+ * por dolar y el monto de caja base inicial del establecimiento, sincronizando el
+ * formulario con la configuracion vigente.
+ *
+ * @param {Object} props
+ * @param {{ tasa_cambio_usd: number, caja_base: number, updated_at: string }} props.config - Configuracion actual del sistema.
+ * @param {Function} props.onUpdated - Callback invocado con la configuracion actualizada tras guardar.
+ * @returns {JSX.Element}
+ */
 export function Configuration({ config, onUpdated }) {
   const [draft, setDraft] = useState(String(config.tasa_cambio_usd));
+  const [cajaDraft, setCajaDraft] = useState(String(config.caja_base ?? 0));
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
@@ -15,20 +27,36 @@ export function Configuration({ config, onUpdated }) {
     setDraft(String(config.tasa_cambio_usd));
   }, [config.tasa_cambio_usd]);
 
+  useEffect(() => {
+    setCajaDraft(String(config.caja_base ?? 0));
+  }, [config.caja_base]);
+
+  /**
+   * Valida la tasa de cambio y el monto de caja base, los envia al servidor y notifica
+   * la configuracion actualizada mostrando un mensaje de exito o error.
+   *
+   * @param {React.FormEvent} event - Evento de envio del formulario.
+   * @returns {Promise<void>}
+   */
   async function submit(event) {
     event.preventDefault();
     const parsed = Number(draft);
     if (!Number.isFinite(parsed) || parsed <= 0) {
-      setError('Ingresa un numero positivo.');
+      setError('Ingresa una tasa de cambio positiva.');
+      return;
+    }
+    const cajaParsed = Number(cajaDraft);
+    if (!Number.isFinite(cajaParsed) || cajaParsed < 0) {
+      setError('El monto de caja base no es valido.');
       return;
     }
     setSaving(true);
     setError('');
     setMessage('');
     try {
-      const updated = await api.put('/config', { tasa_cambio_usd: parsed });
+      const updated = await api.put('/config', { tasa_cambio_usd: parsed, caja_base: cajaParsed });
       onUpdated(updated);
-      setMessage('Tasa de cambio actualizada.');
+      setMessage('Configuracion actualizada.');
     } catch (err) {
       setError(err.message);
     } finally {
@@ -62,11 +90,25 @@ export function Configuration({ config, onUpdated }) {
           )}
         </p>
 
+        <Field label="Caja base (efectivo inicial del establecimiento en NIO)">
+          <input
+            type="number"
+            step="0.01"
+            min="0"
+            value={cajaDraft}
+            onChange={(e) => setCajaDraft(e.target.value)}
+          />
+        </Field>
+
+        <p className="muted">
+          Monto de partida de la caja chica. Las entradas y salidas se registran en el modulo Caja.
+        </p>
+
         {error && <div className="alert">{error}</div>}
         {message && <div className="loading">{message}</div>}
 
         <button type="submit" disabled={saving}>
-          {saving ? 'Guardando...' : 'Guardar tasa'}
+          {saving ? 'Guardando...' : 'Guardar configuracion'}
         </button>
       </form>
     </section>

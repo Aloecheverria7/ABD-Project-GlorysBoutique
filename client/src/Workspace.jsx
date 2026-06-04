@@ -15,10 +15,21 @@ import { PurchaseHistory } from './views/PurchaseHistory.jsx';
 import { UsersView } from './views/Users.jsx';
 import { PaymentTypes } from './views/PaymentTypes.jsx';
 import { Payments } from './views/Payments.jsx';
+import { Caja } from './views/Caja.jsx';
 import { useBootstrap } from './hooks/useBootstrap.js';
 import { canAccess, visibleMenu } from './utils/menu.js';
 import { VIEW_TITLES } from './constants.js';
 
+/**
+ * Componente principal del panel tras iniciar sesion.
+ * Carga los datos del negocio, gestiona la vista activa, el control de acceso por
+ * rol y la barra lateral, y renderiza el modulo seleccionado.
+ *
+ * @param {Object} props
+ * @param {{ id: number, rol: string }} props.user - Usuario autenticado.
+ * @param {Function} props.onLogout - Callback que cierra la sesion del usuario.
+ * @returns {JSX.Element}
+ */
 export function Workspace({ user, onLogout }) {
   const data = useBootstrap(user);
   const allowedDefault = canAccess('dashboard', user.rol) ? 'dashboard' : visibleMenu(user.rol)[0]?.items[0]?.id;
@@ -31,6 +42,12 @@ export function Workspace({ user, onLogout }) {
     }
   }, [user.rol]);
 
+  /**
+   * Determina y renderiza el componente de la vista activa.
+   * Si el usuario no tiene acceso al modulo, muestra un mensaje de alerta.
+   *
+   * @returns {JSX.Element}
+   */
   function renderView() {
     if (!canAccess(activeView, user.rol)) {
       return <div className="alert">No tienes acceso a este modulo.</div>;
@@ -58,6 +75,8 @@ export function Workspace({ user, onLogout }) {
         return <PaymentTypes paymentTypes={data.paymentTypes} reload={data.reload} />;
       case 'payments':
         return <Payments abonos={data.abonos} customers={data.customers} paymentTypes={data.paymentTypes} reload={data.reload} />;
+      case 'caja':
+        return <Caja caja={data.caja} reload={data.reload} user={user} />;
       case 'config':
         return <Configuration config={data.config} onUpdated={data.updateConfig} />;
       case 'dashboard':

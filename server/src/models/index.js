@@ -1,3 +1,7 @@
+/**
+ * @file Definicion de los modelos Sequelize del dominio (roles, usuarios, clientes, productos,
+ * inventario, ventas, compras, abonos, caja, etc.), sus asociaciones y el objeto agregado de modelos.
+ */
 import { DataTypes } from 'sequelize';
 import { sequelize } from '../db.js';
 
@@ -102,8 +106,18 @@ export const Venta = sequelize.define('Venta', {
 export const Configuracion = sequelize.define('Configuracion', {
   id: { type: DataTypes.INTEGER, primaryKey: true },
   tasa_cambio_usd: { type: DataTypes.DECIMAL(10, 4), allowNull: false, defaultValue: 36.62 },
+  caja_base: { type: DataTypes.DECIMAL(10, 2), allowNull: false, defaultValue: 0 },
   updated_at: { type: DataTypes.DATE, defaultValue: DataTypes.NOW }
 }, { tableName: 'configuracion', timestamps: false });
+
+export const CajaMovimiento = sequelize.define('CajaMovimiento', {
+  id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  tipo: { type: DataTypes.ENUM('entrada', 'salida'), allowNull: false },
+  monto: { type: DataTypes.DECIMAL(10, 2), allowNull: false },
+  motivo: DataTypes.STRING(255),
+  usuario_id: DataTypes.INTEGER,
+  fecha: { type: DataTypes.DATE, defaultValue: DataTypes.NOW }
+}, { tableName: 'caja_movimientos', timestamps: false });
 
 export const DetalleVenta = sequelize.define('DetalleVenta', {
   id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
@@ -144,6 +158,8 @@ export const Abono = sequelize.define('Abono', {
   fecha: { type: DataTypes.DATE, defaultValue: DataTypes.NOW }
 }, { tableName: 'abonos', timestamps: false });
 
+// Definicion de las asociaciones entre modelos (relaciones uno a muchos, uno a uno
+// y muchos a muchos) que establecen las claves foraneas y los alias usados en las consultas.
 Role.hasMany(Usuario, { foreignKey: 'rol_id' });
 Usuario.belongsTo(Role, { foreignKey: 'rol_id' });
 
@@ -218,8 +234,12 @@ Abono.belongsTo(TipoPago, { foreignKey: 'tipo_pago_id', as: 'tipoPagoInfo' });
 Usuario.hasMany(Abono, { foreignKey: 'usuario_id' });
 Abono.belongsTo(Usuario, { foreignKey: 'usuario_id', as: 'usuarioInfo' });
 
+Usuario.hasMany(CajaMovimiento, { foreignKey: 'usuario_id' });
+CajaMovimiento.belongsTo(Usuario, { foreignKey: 'usuario_id', as: 'usuarioInfo' });
+
 export const models = {
   Abono,
+  CajaMovimiento,
   Categoria,
   Cliente,
   Compra,
