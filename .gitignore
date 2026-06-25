@@ -9,3 +9,5 @@ npm-debug.log*
 server/.env
 
 CLAUDE.md
+
+docker-compose.override.yml
