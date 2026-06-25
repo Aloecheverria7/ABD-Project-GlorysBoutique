@@ -52,8 +52,13 @@ function formatVariant(variant) {
     producto: data.productoInfo?.nombre || null,
     precio_base: data.productoInfo?.precio_base != null ? Number(data.productoInfo.precio_base) : null,
     precio_usd: data.productoInfo?.precio_usd != null ? Number(data.productoInfo.precio_usd) : null,
+    categoria_id: data.productoInfo?.categoria_id ?? null,
+    categoria: data.productoInfo?.categoriaInfo?.nombre || null,
+    subcategoria_id: data.productoInfo?.subcategoria_id ?? null,
+    subcategoria: data.productoInfo?.subcategoriaInfo?.nombre || null,
     color: data.color,
     talla: data.talla,
+    unidad: data.unidad || 'unidad',
     cantidad: data.inventario?.cantidad || 0
   };
 }
@@ -226,7 +231,15 @@ productsRouter.delete('/:id', adminOnly, asyncHandler(async (req, res) => {
 productsRouter.get('/variants', asyncHandler(async (_req, res) => {
   const variants = await ProductoVariante.findAll({
     include: [
-      { model: Producto, as: 'productoInfo', attributes: ['nombre', 'precio_base', 'precio_usd'] },
+      {
+        model: Producto,
+        as: 'productoInfo',
+        attributes: ['nombre', 'precio_base', 'precio_usd', 'categoria_id', 'subcategoria_id'],
+        include: [
+          { model: Categoria, as: 'categoriaInfo', attributes: ['nombre'] },
+          { model: Subcategoria, as: 'subcategoriaInfo', attributes: ['nombre'] }
+        ]
+      },
       { model: Inventario, as: 'inventario', attributes: ['cantidad'] }
     ],
     order: [
@@ -248,12 +261,17 @@ productsRouter.get('/variants', asyncHandler(async (_req, res) => {
  */
 productsRouter.post('/:id/variants', adminOnly, asyncHandler(async (req, res) => {
   const { color, talla, cantidad } = req.body;
+  // Soporte de pacas: una variante 'paca' rinde piezas_por_paca unidades vendibles al ingresarla.
+  const unidad = req.body.unidad === 'paca' ? 'paca' : 'unidad';
+  const piezasPorPaca = unidad === 'paca' ? Math.max(1, Math.trunc(Number(req.body.piezas_por_paca) || 1)) : 1;
 
   const variant = await sequelize.transaction(async (transaction) => {
     const createdVariant = await ProductoVariante.create({
       producto_id: req.params.id,
       color: color || null,
-      talla: talla || null
+      talla: talla || null,
+      unidad,
+      piezas_por_paca: piezasPorPaca
     }, { transaction });
 
     await Inventario.create({
@@ -269,6 +287,8 @@ productsRouter.post('/:id/variants', adminOnly, asyncHandler(async (req, res) =>
     producto_id: Number(req.params.id),
     color,
     talla,
+    unidad,
+    piezas_por_paca: piezasPorPaca,
     cantidad
   });
 }));

@@ -7,6 +7,7 @@ import { Configuration } from './views/Configuration.jsx';
 import { Products } from './views/Products.jsx';
 import { Customers } from './views/Customers.jsx';
 import { Inventory } from './views/Inventory.jsx';
+import { Perdidas } from './views/Perdidas.jsx';
 import { POS } from './views/POS.jsx';
 import { Sales } from './views/Sales.jsx';
 import { Suppliers } from './views/Suppliers.jsx';
@@ -15,6 +16,7 @@ import { PurchaseHistory } from './views/PurchaseHistory.jsx';
 import { UsersView } from './views/Users.jsx';
 import { PaymentTypes } from './views/PaymentTypes.jsx';
 import { Payments } from './views/Payments.jsx';
+import { Credito } from './views/Credito.jsx';
 import { Caja } from './views/Caja.jsx';
 import { useBootstrap } from './hooks/useBootstrap.js';
 import { canAccess, visibleMenu } from './utils/menu.js';
@@ -61,8 +63,10 @@ export function Workspace({ user, onLogout }) {
         return <Customers customers={data.customers} lookups={data.lookups} reload={data.reload} user={user} />;
       case 'inventory':
         return <Inventory products={data.products} variants={data.variants} inventory={data.inventory} reload={data.reload} />;
+      case 'losses':
+        return <Perdidas variants={data.variants} reload={data.reload} />;
       case 'pos':
-        return <POS variants={data.variants} customers={data.customers} lookups={data.lookups} config={data.config} user={user} reload={data.reload} />;
+        return <POS variants={data.variants} customers={data.customers} lookups={data.lookups} config={data.config} caja={data.caja} user={user} reload={data.reload} />;
       case 'sales':
         return <Sales sales={data.sales} user={user} />;
       case 'purchases':
@@ -75,13 +79,15 @@ export function Workspace({ user, onLogout }) {
         return <PaymentTypes paymentTypes={data.paymentTypes} reload={data.reload} />;
       case 'payments':
         return <Payments abonos={data.abonos} customers={data.customers} paymentTypes={data.paymentTypes} reload={data.reload} />;
+      case 'credit':
+        return <Credito />;
       case 'caja':
         return <Caja caja={data.caja} reload={data.reload} user={user} />;
       case 'config':
         return <Configuration config={data.config} onUpdated={data.updateConfig} />;
       case 'dashboard':
       default:
-        return <Dashboard data={data} user={user} />;
+        return <Dashboard data={data} user={user} onNavigate={setActiveView} />;
     }
   }
 

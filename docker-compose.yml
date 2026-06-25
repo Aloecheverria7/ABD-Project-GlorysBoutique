@@ -1,0 +1,67 @@
+# Despliegue completo (BD + API + cliente) para Coolify usando "Docker Compose".
+# Alternativa al despliegue de cada app por separado con su Dockerfile.
+#
+# En Coolify: crea un recurso tipo "Docker Compose", apunta a este repo y define las
+# variables de entorno (Environment Variables). Asigna un dominio a los servicios
+# `server` y `client` desde la UI de Coolify (su proxy Traefik enruta a los puertos expuestos).
+#
+# Variables que debes definir en Coolify:
+#   DB_PASSWORD     contrasena de MySQL (root)
+#   JWT_SECRET      secreto para firmar los JWT (obligatorio, el API no arranca sin el)
+#   CLIENT_ORIGIN   URL publica del cliente, p. ej. https://glorys.tudominio.com  (para CORS)
+#   VITE_API_URL    URL publica del API + /api, p. ej. https://api.tudominio.com/api  (build arg)
+#   DB_NAME         opcional, por defecto glorysboutique_BD
+#   DB_SEED         opcional, "true" para sembrar datos de ejemplo en la primera migracion
+
+services:
+  db:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+      MYSQL_DATABASE: ${DB_NAME:-glorysboutique_BD}
+    volumes:
+      - db-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-p${DB_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  server:
+    build:
+      context: ./server
+    restart: unless-stopped
+    environment:
+      PORT: 4000
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_USER: root
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME:-glorysboutique_BD}
+      # Migra y siembra el esquema al arrancar (crea las tablas via Sequelize sync).
+      DB_AUTO_MIGRATE: "true"
+      DB_SEED: ${DB_SEED:-true}
+      DB_LOGGING: "false"
+      JWT_SECRET: ${JWT_SECRET}
+      CLIENT_ORIGIN: ${CLIENT_ORIGIN}
+    expose:
+      - "4000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  client:
+    build:
+      context: ./client
+      args:
+        # Build arg: Vite incrusta esta URL en el bundle al compilar.
+        VITE_API_URL: ${VITE_API_URL}
+    restart: unless-stopped
+    expose:
+      - "80"
+    depends_on:
+      - server
+
+volumes:
+  db-data:

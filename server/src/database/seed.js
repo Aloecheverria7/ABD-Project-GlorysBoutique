@@ -8,6 +8,7 @@ import {
   Categoria,
   Cliente,
   Configuracion,
+  Denominacion,
   DetalleVenta,
   Inventario,
   Producto,
@@ -71,6 +72,21 @@ export async function seedDatabase() {
     { id: 2, nombre: 'Tarjeta', es_credito: false },
     { id: 3, nombre: 'Transferencia', es_credito: false },
     { id: 4, nombre: 'Credito', es_credito: true }
+  ], { ignoreDuplicates: true });
+
+  // Denominaciones del cordoba nicaragüense (NIO): billetes y monedas en circulacion.
+  // Son la base para registrar el efectivo de la apertura de caja y desglosar el vuelto en el POS.
+  await Denominacion.bulkCreate([
+    { id: 1, valor: 1000, tipo: 'billete', moneda: 'NIO' },
+    { id: 2, valor: 500, tipo: 'billete', moneda: 'NIO' },
+    { id: 3, valor: 200, tipo: 'billete', moneda: 'NIO' },
+    { id: 4, valor: 100, tipo: 'billete', moneda: 'NIO' },
+    { id: 5, valor: 50, tipo: 'billete', moneda: 'NIO' },
+    { id: 6, valor: 20, tipo: 'billete', moneda: 'NIO' },
+    { id: 7, valor: 10, tipo: 'billete', moneda: 'NIO' },
+    { id: 8, valor: 5, tipo: 'moneda', moneda: 'NIO' },
+    { id: 9, valor: 1, tipo: 'moneda', moneda: 'NIO' },
+    { id: 10, valor: 0.5, tipo: 'moneda', moneda: 'NIO' }
   ], { ignoreDuplicates: true });
 
   await Categoria.bulkCreate([

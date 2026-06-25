@@ -310,6 +310,18 @@ button:disabled {
   padding: 16px;
 }
 
+.stat--clickable {
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 120ms ease, transform 80ms ease;
+  width: 100%;
+}
+
+.stat--clickable:hover {
+  border-color: #1f6f68;
+  transform: translateY(-1px);
+}
+
 .stat svg {
   color: #1f6f68;
   flex: 0 0 auto;
@@ -593,6 +605,244 @@ button.ghost:hover:not(:disabled) {
   font-size: 0.85rem;
   margin: 8px 0;
   text-align: center;
+}
+
+.pos-category-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.pos-category-card {
+  align-items: center;
+  background: white;
+  border: 1px solid #e3e8ef;
+  border-radius: 10px;
+  color: #18212f;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  justify-content: center;
+  min-height: 96px;
+  padding: 16px 12px;
+  text-align: center;
+  transition: border-color 120ms ease, transform 80ms ease;
+}
+
+.pos-category-card:hover {
+  border-color: #1f6f68;
+  transform: translateY(-1px);
+}
+
+.pos-category-card strong {
+  font-size: 0.98rem;
+}
+
+.pos-category-card small {
+  color: #64748b;
+  font-size: 0.74rem;
+}
+
+.pos-category-bar {
+  align-items: center;
+}
+
+.pos-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.pos-filters select {
+  flex: 1 1 120px;
+  min-width: 110px;
+}
+
+.pos-credit {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pos-credit-plan {
+  background: #f8fafc;
+  border: 1px solid #e3e8ef;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+}
+
+.pos-credit-plan .link-row {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+}
+
+.pos-credit-plan .link-row input {
+  max-width: 130px;
+}
+
+.pos-payment {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pos-change {
+  background: #eef7f5;
+  border: 1px solid #cbe5df;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+}
+
+.pos-change-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.pos-change-list li {
+  color: #0f2a32;
+  font-size: 0.85rem;
+}
+
+.credit-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.credit-card {
+  border: 1px solid #e3e8ef;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.credit-head {
+  align-items: center;
+  background: white;
+  cursor: pointer;
+  display: flex;
+  gap: 10px;
+  padding: 12px 14px;
+  text-align: left;
+  width: 100%;
+}
+
+.credit-head-main {
+  flex: 1;
+}
+
+.credit-head-totals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-weight: 700;
+}
+
+.credit-body {
+  border-top: 1px solid #e3e8ef;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px 14px;
+}
+
+.credit-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  font-size: 0.85rem;
+}
+
+.credit-debt {
+  background: #f8fafc;
+  border: 1px solid #e3e8ef;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+}
+
+.denom-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  margin-bottom: 12px;
+}
+
+.denom-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.85rem;
+}
+
+.modal-backdrop {
+  align-items: flex-start;
+  background: rgba(15, 23, 42, 0.5);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  overflow-y: auto;
+  padding: 40px 16px;
+  position: fixed;
+  z-index: 50;
+}
+
+.modal {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(15, 23, 42, 0.3);
+  max-width: 640px;
+  width: 100%;
+}
+
+.modal-head {
+  align-items: center;
+  border-bottom: 1px solid #e3e8ef;
+  display: flex;
+  justify-content: space-between;
+  padding: 14px 18px;
+}
+
+.modal-head h3 {
+  margin: 0;
+}
+
+.modal-body {
+  padding: 18px;
+}
+
+.toolbar {
+  align-items: flex-end;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.toolbar .spacer {
+  flex: 1;
+}
+
+.toolbar input,
+.toolbar select {
+  min-width: 120px;
 }
 
 .pos-cart {

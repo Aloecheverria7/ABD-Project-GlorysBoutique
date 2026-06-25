@@ -1,6 +1,6 @@
 /** @file Rutas de catalogos: listas de apoyo (lookups), proveedores y categorias. */
 import { Router } from 'express';
-import { Categoria, Proveedor, Role, Subcategoria, TipoCliente, TipoPago, Usuario } from '../models/index.js';
+import { Categoria, Denominacion, Proveedor, Role, Subcategoria, TipoCliente, TipoPago, Usuario } from '../models/index.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { asyncHandler, sendCreated } from '../utils/http.js';
 
@@ -17,7 +17,7 @@ catalogRouter.use(requireAuth);
  * @returns {Promise<void>}
  */
 catalogRouter.get('/lookups', asyncHandler(async (_req, res) => {
-  const [categorias, subcategorias, proveedores, tiposCliente, tiposPago, usuarios, roles] = await Promise.all([
+  const [categorias, subcategorias, proveedores, tiposCliente, tiposPago, usuarios, roles, denominaciones] = await Promise.all([
     Categoria.findAll({ order: [['nombre', 'ASC']] }),
     Subcategoria.findAll({ order: [['nombre', 'ASC']] }),
     Proveedor.findAll({ order: [['nombre', 'ASC']] }),
@@ -27,10 +27,11 @@ catalogRouter.get('/lookups', asyncHandler(async (_req, res) => {
       attributes: ['id', 'username', 'rol_id', 'activo'],
       order: [['username', 'ASC']]
     }),
-    Role.findAll({ order: [['nombre', 'ASC']] })
+    Role.findAll({ order: [['nombre', 'ASC']] }),
+    Denominacion.findAll({ where: { activo: true }, order: [['valor', 'DESC']] })
   ]);
 
-  res.json({ categorias, subcategorias, proveedores, tiposCliente, tiposPago, usuarios, roles });
+  res.json({ categorias, subcategorias, proveedores, tiposCliente, tiposPago, usuarios, roles, denominaciones });
 }));
 
 /**

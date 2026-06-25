@@ -1,7 +1,8 @@
 /** @file Vista de gestion de productos: alta, edicion, eliminacion, precios en NIO/USD y vinculo con proveedores. */
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { PackagePlus, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { Field } from '../components/Field.jsx';
+import { Modal } from '../components/Modal.jsx';
 import { api } from '../api.js';
 import { fmt } from '../utils/format.js';
 
@@ -33,6 +34,27 @@ export function Products({ products, suppliers = [], lookups, reload }) {
   const [supplierLinks, setSupplierLinks] = useState([]);
   const [editingId, setEditingId] = useState(null);
   const [error, setError] = useState('');
+  const [modalOpen, setModalOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const [filterCategoria, setFilterCategoria] = useState('');
+  const [filterSubcategoria, setFilterSubcategoria] = useState('');
+  const [priceMin, setPriceMin] = useState('');
+  const [priceMax, setPriceMax] = useState('');
+
+  const filteredProducts = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    const min = priceMin === '' ? null : Number(priceMin);
+    const max = priceMax === '' ? null : Number(priceMax);
+    return products.filter((p) => {
+      if (q && !`${p.nombre || ''}`.toLowerCase().includes(q)) return false;
+      if (filterCategoria && String(p.categoria_id) !== filterCategoria) return false;
+      if (filterSubcategoria && String(p.subcategoria_id) !== filterSubcategoria) return false;
+      const precio = p.precio_base;
+      if (min != null && (precio == null || precio < min)) return false;
+      if (max != null && (precio == null || precio > max)) return false;
+      return true;
+    });
+  }, [products, search, filterCategoria, filterSubcategoria, priceMin, priceMax]);
 
   /**
    * Agrega una fila vacia para vincular un nuevo proveedor al producto.
@@ -70,8 +92,17 @@ export function Products({ products, suppliers = [], lookups, reload }) {
    * @param {Object} product - Producto seleccionado para editar.
    * @returns {void}
    */
+  function openCreate() {
+    setEditingId(null);
+    setForm(emptyForm);
+    setSupplierLinks([]);
+    setError('');
+    setModalOpen(true);
+  }
+
   function startEdit(product) {
     setEditingId(product.id);
+    setModalOpen(true);
     setForm({
       nombre: product.nombre || '',
       descripcion: product.descripcion || '',
@@ -99,6 +130,7 @@ export function Products({ products, suppliers = [], lookups, reload }) {
     setForm(emptyForm);
     setSupplierLinks([]);
     setError('');
+    setModalOpen(false);
   }
 
   /**
@@ -170,8 +202,30 @@ export function Products({ products, suppliers = [], lookups, reload }) {
         <h2>Productos</h2>
       </div>
       <p className="muted small">Cada producto puede tener su precio fijo en cordobas, en dolares o ambos, y uno o varios proveedores.</p>
-      <form className="grid-form" onSubmit={submit}>
-        <Field label="Nombre">
+
+      <div className="toolbar">
+        <button type="button" onClick={openCreate}>
+          <Plus size={14} />
+          <span>Agregar producto</span>
+        </button>
+        <span className="spacer" />
+        <input placeholder="Buscar producto..." value={search} onChange={(e) => setSearch(e.target.value)} />
+        <select value={filterCategoria} onChange={(e) => setFilterCategoria(e.target.value)}>
+          <option value="">Toda categoria</option>
+          {lookups?.categorias.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+        </select>
+        <select value={filterSubcategoria} onChange={(e) => setFilterSubcategoria(e.target.value)}>
+          <option value="">Toda subcategoria</option>
+          {lookups?.subcategorias.map((s) => <option key={s.id} value={s.id}>{s.nombre}</option>)}
+        </select>
+        <input type="number" step="0.01" min="0" placeholder="Precio min" value={priceMin} onChange={(e) => setPriceMin(e.target.value)} />
+        <input type="number" step="0.01" min="0" placeholder="Precio max" value={priceMax} onChange={(e) => setPriceMax(e.target.value)} />
+      </div>
+
+      {modalOpen && (
+        <Modal title={editingId ? 'Editar producto' : 'Agregar producto'} onClose={cancelEdit}>
+          <form className="grid-form" onSubmit={submit}>
+            <Field label="Nombre">
           <input required value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} />
         </Field>
         <Field label="Precio (NIO)">
@@ -255,14 +309,14 @@ export function Products({ products, suppliers = [], lookups, reload }) {
         {error && <div className="alert">{error}</div>}
         <div className="row">
           <button type="submit">{editingId ? 'Actualizar producto' : 'Guardar producto'}</button>
-          {editingId && (
-            <button type="button" className="ghost" onClick={cancelEdit}>
-              <X size={14} />
-              <span>Cancelar</span>
-            </button>
-          )}
+          <button type="button" className="ghost" onClick={cancelEdit}>
+            <X size={14} />
+            <span>Cancelar</span>
+          </button>
         </div>
-      </form>
+          </form>
+        </Modal>
+      )}
 
       <div className="table-wrap">
         <table>
@@ -277,7 +331,7 @@ export function Products({ products, suppliers = [], lookups, reload }) {
             </tr>
           </thead>
           <tbody>
-            {products.map((product) => (
+            {filteredProducts.map((product) => (
               <tr key={product.id}>
                 <td>{product.nombre}</td>
                 <td>{product.categoria || '-'}</td>
@@ -306,7 +360,7 @@ export function Products({ products, suppliers = [], lookups, reload }) {
                 </td>
               </tr>
             ))}
-            {products.length === 0 && <tr><td colSpan="6">Aun no hay productos registrados.</td></tr>}
+            {filteredProducts.length === 0 && <tr><td colSpan="6">No hay productos que coincidan.</td></tr>}
           </tbody>
         </table>
       </div>

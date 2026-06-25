@@ -76,7 +76,11 @@ export const ProductoVariante = sequelize.define('ProductoVariante', {
   id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
   producto_id: { type: DataTypes.INTEGER, allowNull: false },
   color: DataTypes.STRING(50),
-  talla: DataTypes.STRING(20)
+  talla: DataTypes.STRING(20),
+  // Unidad de manejo de la variante. Una 'paca' representa una compra al por mayor que, al
+  // ingresarla, se "explota" en piezas_por_paca unidades vendibles del inventario.
+  unidad: { type: DataTypes.ENUM('unidad', 'paca'), allowNull: false, defaultValue: 'unidad' },
+  piezas_por_paca: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 1 }
 }, { tableName: 'producto_variantes', timestamps: false });
 
 export const Inventario = sequelize.define('Inventario', {
@@ -97,6 +101,8 @@ export const Venta = sequelize.define('Venta', {
   cliente_nombre: DataTypes.STRING(150),
   usuario_id: DataTypes.INTEGER,
   tipo_pago_id: DataTypes.INTEGER,
+  // 'contado' permite pagos mixtos (efectivo + tarjeta); 'credito' genera una deuda con plan de cuotas.
+  tipo_venta: { type: DataTypes.ENUM('contado', 'credito'), allowNull: false, defaultValue: 'contado' },
   total: { type: DataTypes.DECIMAL(10, 2), allowNull: false, defaultValue: 0 },
   moneda: { type: DataTypes.STRING(3), allowNull: false, defaultValue: 'NIO' },
   tasa_cambio: DataTypes.DECIMAL(10, 4),
@@ -149,6 +155,9 @@ export const DetalleCompra = sequelize.define('DetalleCompra', {
 export const Abono = sequelize.define('Abono', {
   id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
   cliente_id: { type: DataTypes.INTEGER, allowNull: false },
+  // Deuda a la que se aplica el abono. Es opcional para conservar compatibilidad con los abonos
+  // historicos (anteriores al registro explicito de deudas), que solo se asociaban al cliente.
+  deuda_id: { type: DataTypes.INTEGER, allowNull: true },
   tipo_pago_id: { type: DataTypes.INTEGER, allowNull: false },
   usuario_id: DataTypes.INTEGER,
   monto: { type: DataTypes.DECIMAL(10, 2), allowNull: false },
@@ -157,6 +166,98 @@ export const Abono = sequelize.define('Abono', {
   notas: DataTypes.STRING(255),
   fecha: { type: DataTypes.DATE, defaultValue: DataTypes.NOW }
 }, { tableName: 'abonos', timestamps: false });
+
+// Registro explicito de deuda generado por una venta a credito. Concentra el monto financiado
+// (total de la venta menos el enganche) y su plan de pagos. El saldo pendiente se obtiene restando
+// los abonos asociados; cuando llega a cero la deuda pasa a 'saldada'.
+export const Deuda = sequelize.define('Deuda', {
+  id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  venta_id: { type: DataTypes.INTEGER, allowNull: false },
+  cliente_id: { type: DataTypes.INTEGER, allowNull: false },
+  monto_total: { type: DataTypes.DECIMAL(10, 2), allowNull: false },
+  moneda: { type: DataTypes.STRING(3), allowNull: false, defaultValue: 'NIO' },
+  tasa_cambio: DataTypes.DECIMAL(10, 4),
+  num_cuotas: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 1 },
+  estado: { type: DataTypes.ENUM('pendiente', 'saldada'), allowNull: false, defaultValue: 'pendiente' },
+  fecha: { type: DataTypes.DATE, defaultValue: DataTypes.NOW }
+}, { tableName: 'deudas', timestamps: false });
+
+// Cuota individual del plan de pagos de una deuda (numero de cuota, monto y vencimiento).
+export const Cuota = sequelize.define('Cuota', {
+  id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  deuda_id: { type: DataTypes.INTEGER, allowNull: false },
+  numero: { type: DataTypes.INTEGER, allowNull: false },
+  monto: { type: DataTypes.DECIMAL(10, 2), allowNull: false },
+  fecha_vencimiento: DataTypes.DATEONLY,
+  estado: { type: DataTypes.ENUM('pendiente', 'pagada'), allowNull: false, defaultValue: 'pendiente' }
+}, { tableName: 'cuotas', timestamps: false });
+
+// Linea de pago de una venta de contado. Una venta puede liquidarse con varias lineas (pago mixto:
+// efectivo + tarjeta). Para las lineas en efectivo se guarda el efectivo recibido y el vuelto.
+export const VentaPago = sequelize.define('VentaPago', {
+  id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  venta_id: { type: DataTypes.INTEGER, allowNull: false },
+  tipo_pago_id: { type: DataTypes.INTEGER, allowNull: false },
+  monto: { type: DataTypes.DECIMAL(10, 2), allowNull: false },
+  moneda: { type: DataTypes.STRING(3), allowNull: false, defaultValue: 'NIO' },
+  efectivo_recibido: DataTypes.DECIMAL(10, 2),
+  vuelto: DataTypes.DECIMAL(10, 2)
+}, { tableName: 'venta_pagos', timestamps: false });
+
+// Catalogo de denominaciones de billetes y monedas. Sirve de base para registrar el efectivo
+// disponible en la apertura de caja y para desglosar el vuelto en el POS.
+export const Denominacion = sequelize.define('Denominacion', {
+  id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  valor: { type: DataTypes.DECIMAL(10, 2), allowNull: false },
+  tipo: { type: DataTypes.ENUM('billete', 'moneda'), allowNull: false, defaultValue: 'billete' },
+  moneda: { type: DataTypes.STRING(3), allowNull: false, defaultValue: 'NIO' },
+  activo: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: true }
+}, { tableName: 'denominaciones', timestamps: false });
+
+// Apertura de caja: foto del efectivo disponible al iniciar una sesion de caja, desglosado por
+// denominacion en CajaAperturaDetalle. El POS usa la apertura abierta mas reciente para calcular el vuelto.
+export const CajaApertura = sequelize.define('CajaApertura', {
+  id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  usuario_id: DataTypes.INTEGER,
+  total: { type: DataTypes.DECIMAL(10, 2), allowNull: false, defaultValue: 0 },
+  estado: { type: DataTypes.ENUM('abierta', 'cerrada'), allowNull: false, defaultValue: 'abierta' },
+  fecha: { type: DataTypes.DATE, defaultValue: DataTypes.NOW }
+}, { tableName: 'caja_aperturas', timestamps: false });
+
+export const CajaAperturaDetalle = sequelize.define('CajaAperturaDetalle', {
+  id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  apertura_id: { type: DataTypes.INTEGER, allowNull: false },
+  denominacion_id: { type: DataTypes.INTEGER, allowNull: false },
+  cantidad: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 }
+}, { tableName: 'caja_apertura_detalle', timestamps: false });
+
+// Movimiento de Kardex: bitacora de existencias por variante (ingreso, salida o ajuste) con su
+// motivo y, opcionalmente, la referencia al documento que lo origino (venta, compra, perdida...).
+export const KardexMovimiento = sequelize.define('KardexMovimiento', {
+  id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  producto_variante_id: { type: DataTypes.INTEGER, allowNull: false },
+  tipo: { type: DataTypes.ENUM('ingreso', 'salida', 'ajuste'), allowNull: false },
+  cantidad: { type: DataTypes.INTEGER, allowNull: false },
+  motivo: DataTypes.STRING(255),
+  costo_unitario: DataTypes.DECIMAL(10, 2),
+  referencia_tipo: DataTypes.STRING(30),
+  referencia_id: DataTypes.INTEGER,
+  usuario_id: DataTypes.INTEGER,
+  fecha: { type: DataTypes.DATE, defaultValue: DataTypes.NOW }
+}, { tableName: 'kardex_movimientos', timestamps: false });
+
+// Registro de perdidas de producto (deterioro, robo, merma, etc.). Descuenta inventario y representa
+// un egreso de tipo 'perdida' valorado al costo capturado.
+export const Perdida = sequelize.define('Perdida', {
+  id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  producto_variante_id: { type: DataTypes.INTEGER, allowNull: false },
+  cantidad: { type: DataTypes.INTEGER, allowNull: false },
+  costo_unitario: { type: DataTypes.DECIMAL(10, 2), allowNull: false, defaultValue: 0 },
+  costo_total: { type: DataTypes.DECIMAL(10, 2), allowNull: false, defaultValue: 0 },
+  motivo: { type: DataTypes.STRING(100), allowNull: false, defaultValue: 'otro' },
+  usuario_id: DataTypes.INTEGER,
+  fecha: { type: DataTypes.DATE, defaultValue: DataTypes.NOW }
+}, { tableName: 'perdidas', timestamps: false });
 
 // Definicion de las asociaciones entre modelos (relaciones uno a muchos, uno a uno
 // y muchos a muchos) que establecen las claves foraneas y los alias usados en las consultas.
@@ -237,16 +338,63 @@ Abono.belongsTo(Usuario, { foreignKey: 'usuario_id', as: 'usuarioInfo' });
 Usuario.hasMany(CajaMovimiento, { foreignKey: 'usuario_id' });
 CajaMovimiento.belongsTo(Usuario, { foreignKey: 'usuario_id', as: 'usuarioInfo' });
 
+// Una venta a credito genera una unica deuda; la deuda guarda referencia a su venta y cliente.
+Venta.hasOne(Deuda, { foreignKey: 'venta_id', as: 'deuda' });
+Deuda.belongsTo(Venta, { foreignKey: 'venta_id', as: 'ventaInfo' });
+
+Cliente.hasMany(Deuda, { foreignKey: 'cliente_id', as: 'deudas' });
+Deuda.belongsTo(Cliente, { foreignKey: 'cliente_id', as: 'clienteInfo' });
+
+Deuda.hasMany(Cuota, { foreignKey: 'deuda_id', as: 'cuotas' });
+Cuota.belongsTo(Deuda, { foreignKey: 'deuda_id', as: 'deudaInfo' });
+
+Deuda.hasMany(Abono, { foreignKey: 'deuda_id', as: 'abonosDeuda' });
+Abono.belongsTo(Deuda, { foreignKey: 'deuda_id', as: 'deudaInfo' });
+
+Venta.hasMany(VentaPago, { foreignKey: 'venta_id', as: 'pagos' });
+VentaPago.belongsTo(Venta, { foreignKey: 'venta_id' });
+
+TipoPago.hasMany(VentaPago, { foreignKey: 'tipo_pago_id' });
+VentaPago.belongsTo(TipoPago, { foreignKey: 'tipo_pago_id', as: 'tipoPagoInfo' });
+
+Usuario.hasMany(CajaApertura, { foreignKey: 'usuario_id' });
+CajaApertura.belongsTo(Usuario, { foreignKey: 'usuario_id', as: 'usuarioInfo' });
+
+CajaApertura.hasMany(CajaAperturaDetalle, { foreignKey: 'apertura_id', as: 'detalles' });
+CajaAperturaDetalle.belongsTo(CajaApertura, { foreignKey: 'apertura_id' });
+
+Denominacion.hasMany(CajaAperturaDetalle, { foreignKey: 'denominacion_id' });
+CajaAperturaDetalle.belongsTo(Denominacion, { foreignKey: 'denominacion_id', as: 'denominacionInfo' });
+
+ProductoVariante.hasMany(KardexMovimiento, { foreignKey: 'producto_variante_id' });
+KardexMovimiento.belongsTo(ProductoVariante, { foreignKey: 'producto_variante_id', as: 'varianteInfo' });
+
+Usuario.hasMany(KardexMovimiento, { foreignKey: 'usuario_id' });
+KardexMovimiento.belongsTo(Usuario, { foreignKey: 'usuario_id', as: 'usuarioInfo' });
+
+ProductoVariante.hasMany(Perdida, { foreignKey: 'producto_variante_id' });
+Perdida.belongsTo(ProductoVariante, { foreignKey: 'producto_variante_id', as: 'varianteInfo' });
+
+Usuario.hasMany(Perdida, { foreignKey: 'usuario_id' });
+Perdida.belongsTo(Usuario, { foreignKey: 'usuario_id', as: 'usuarioInfo' });
+
 export const models = {
   Abono,
+  CajaApertura,
+  CajaAperturaDetalle,
   CajaMovimiento,
   Categoria,
   Cliente,
   Compra,
   Configuracion,
+  Cuota,
+  Denominacion,
   DetalleCompra,
   DetalleVenta,
+  Deuda,
   Inventario,
+  KardexMovimiento,
+  Perdida,
   Producto,
   ProductoProveedor,
   ProductoVariante,
@@ -256,5 +404,6 @@ export const models = {
   TipoCliente,
   TipoPago,
   Usuario,
-  Venta
+  Venta,
+  VentaPago
 };

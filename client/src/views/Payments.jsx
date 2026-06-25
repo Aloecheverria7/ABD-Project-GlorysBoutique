@@ -29,6 +29,11 @@ export function Payments({ abonos, customers, paymentTypes, reload }) {
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  // Busqueda por texto (cliente nombre/cedula y producto) resuelta en el servidor.
+  const [searchCliente, setSearchCliente] = useState('');
+  const [searchProducto, setSearchProducto] = useState('');
+  const [apiResults, setApiResults] = useState(null);
+  const [searching, setSearching] = useState(false);
 
   const nonCreditTypes = useMemo(
     () => paymentTypes.filter((t) => !t.es_credito),
@@ -90,6 +95,48 @@ export function Payments({ abonos, customers, paymentTypes, reload }) {
       setSubmitting(false);
     }
   }
+
+  /**
+   * Ejecuta la busqueda por texto en el servidor (cliente y/o producto). Si ambos campos estan
+   * vacios, limpia los resultados y vuelve al historial precargado.
+   *
+   * @param {Event} event - Evento de envio del formulario de busqueda.
+   * @returns {Promise<void>}
+   */
+  async function doSearch(event) {
+    event.preventDefault();
+    const c = searchCliente.trim();
+    const p = searchProducto.trim();
+    if (!c && !p) {
+      setApiResults(null);
+      return;
+    }
+    setSearching(true);
+    setError('');
+    try {
+      const params = new URLSearchParams();
+      if (c) params.set('q', c);
+      if (p) params.set('producto', p);
+      setApiResults(await api.get(`/payments?${params.toString()}`));
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSearching(false);
+    }
+  }
+
+  /**
+   * Limpia la busqueda por texto y restablece el historial precargado.
+   *
+   * @returns {void}
+   */
+  function clearSearch() {
+    setSearchCliente('');
+    setSearchProducto('');
+    setApiResults(null);
+  }
+
+  const displayedAbonos = apiResults !== null ? apiResults : filteredAbonos;
 
   return (
     <section className="panel">
@@ -175,6 +222,32 @@ export function Payments({ abonos, customers, paymentTypes, reload }) {
         </Field>
       </div>
 
+      <form className="row" onSubmit={doSearch} style={{ flexWrap: 'wrap', alignItems: 'flex-end' }}>
+        <Field label="Buscar cliente (nombre o cedula)">
+          <input
+            value={searchCliente}
+            onChange={(e) => setSearchCliente(e.target.value)}
+            placeholder="Ej. Maria o 001-..."
+          />
+        </Field>
+        <Field label="Buscar por producto">
+          <input
+            value={searchProducto}
+            onChange={(e) => setSearchProducto(e.target.value)}
+            placeholder="Ej. Blusa, camisa..."
+          />
+        </Field>
+        <button type="submit" disabled={searching}>{searching ? 'Buscando...' : 'Buscar'}</button>
+        {apiResults !== null && (
+          <button type="button" className="ghost" onClick={clearSearch}>Limpiar</button>
+        )}
+      </form>
+      {apiResults !== null && (
+        <p className="muted small">
+          Mostrando {apiResults.length} abono(s) que coinciden con la busqueda.
+        </p>
+      )}
+
       {customer && detail && (
         <div className="balance-cards">
           <div className="balance-card">
@@ -215,7 +288,7 @@ export function Payments({ abonos, customers, paymentTypes, reload }) {
             </tr>
           </thead>
           <tbody>
-            {filteredAbonos.map((abono) => (
+            {displayedAbonos.map((abono) => (
               <tr key={abono.id}>
                 <td>#{abono.id}</td>
                 <td>{abono.cliente || '-'}</td>
@@ -227,7 +300,7 @@ export function Payments({ abonos, customers, paymentTypes, reload }) {
                 <td className="muted small">{abono.notas || '-'}</td>
               </tr>
             ))}
-            {filteredAbonos.length === 0 && <tr><td colSpan="8">No hay abonos para mostrar.</td></tr>}
+            {displayedAbonos.length === 0 && <tr><td colSpan="8">No hay abonos para mostrar.</td></tr>}
           </tbody>
         </table>
       </div>

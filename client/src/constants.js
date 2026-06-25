@@ -8,12 +8,14 @@ import {
   Boxes,
   CreditCard,
   HandCoins,
+  Landmark,
   LayoutDashboard,
   PackagePlus,
   Settings,
   ShoppingBag,
   ShoppingCart,
   Tags,
+  TrendingDown,
   Truck,
   UserCog,
   Users,
@@ -37,7 +39,8 @@ export const MENU = [
     items: [
       { id: 'products', label: 'Productos', icon: PackagePlus, roles: ['admin'] },
       { id: 'suppliers', label: 'Proveedores', icon: Truck, roles: ['admin'] },
-      { id: 'inventory', label: 'Inventario', icon: Boxes, roles: ['admin'] }
+      { id: 'inventory', label: 'Inventario', icon: Boxes, roles: ['admin'] },
+      { id: 'losses', label: 'Perdidas', icon: TrendingDown, roles: ['admin'] }
     ]
   },
   {
@@ -46,6 +49,7 @@ export const MENU = [
       { id: 'pos', label: 'Punto de venta', icon: ShoppingCart, roles: ['admin', 'vendedor'] },
       { id: 'customers', label: 'Clientes', icon: Users, roles: ['admin', 'vendedor'] },
       { id: 'sales', label: 'Historial de ventas', icon: CreditCard, roles: ['admin', 'vendedor'] },
+      { id: 'credit', label: 'Creditos', icon: Landmark, roles: ['admin', 'vendedor'] },
       { id: 'payments', label: 'Abonos', icon: HandCoins, roles: ['admin', 'vendedor'] },
       { id: 'caja', label: 'Caja', icon: Wallet, roles: ['admin', 'vendedor'] }
     ]
@@ -67,9 +71,11 @@ export const VIEW_TITLES = {
   products: 'Productos',
   suppliers: 'Proveedores',
   inventory: 'Inventario',
+  losses: 'Perdidas',
   pos: 'Punto de venta',
   customers: 'Clientes',
   sales: 'Historial de ventas',
+  credit: 'Creditos',
   payments: 'Abonos',
   caja: 'Caja',
   purchases: 'Nueva compra',

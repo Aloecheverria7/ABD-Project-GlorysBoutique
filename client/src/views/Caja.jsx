@@ -2,8 +2,8 @@
  * @file Vista de caja chica. Registra entradas y salidas de efectivo, muestra la
  * base, el saldo actual y el historial de movimientos.
  */
-import React, { useState } from 'react';
-import { ArrowDownCircle, ArrowUpCircle, Trash2, Wallet } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { ArrowDownCircle, ArrowUpCircle, Coins, Trash2, Wallet } from 'lucide-react';
 import { Field } from '../components/Field.jsx';
 import { api } from '../api.js';
 import { fmt } from '../utils/format.js';
@@ -23,11 +23,58 @@ export function Caja({ caja, reload, user }) {
   const [form, setForm] = useState(emptyForm);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  const [denoms, setDenoms] = useState([]);
+  const [counts, setCounts] = useState({});
+  const [openingError, setOpeningError] = useState('');
+  const [opening, setOpening] = useState(false);
   const isAdmin = user?.rol === 'admin';
 
   const base = Number(caja?.base || 0);
   const saldo = Number(caja?.saldo || 0);
   const movimientos = caja?.movimientos || [];
+  const apertura = caja?.apertura || null;
+
+  useEffect(() => {
+    let cancelled = false;
+    api.get('/config/denominaciones')
+      .then((data) => { if (!cancelled) setDenoms(data.filter((d) => d.activo)); })
+      .catch((err) => { if (!cancelled) setOpeningError(err.message); });
+    return () => { cancelled = true; };
+  }, []);
+
+  // Total estimado de la apertura segun los conteos capturados (valor x cantidad).
+  const aperturaTotal = useMemo(
+    () => denoms.reduce((sum, d) => sum + Number(d.valor) * (Number(counts[d.id]) || 0), 0),
+    [denoms, counts]
+  );
+
+  /**
+   * Registra la apertura de caja con el conteo capturado por denominacion.
+   *
+   * @param {Event} event - Evento de envio del formulario de apertura.
+   * @returns {Promise<void>}
+   */
+  async function openApertura(event) {
+    event.preventDefault();
+    setOpeningError('');
+    const detalles = denoms
+      .map((d) => ({ denominacion_id: d.id, cantidad: Math.max(0, Math.trunc(Number(counts[d.id]) || 0)) }))
+      .filter((d) => d.cantidad > 0);
+    if (detalles.length === 0) {
+      setOpeningError('Captura al menos una denominacion con cantidad.');
+      return;
+    }
+    setOpening(true);
+    try {
+      await api.post('/caja/apertura', { detalles });
+      setCounts({});
+      reload();
+    } catch (err) {
+      setOpeningError(err.message);
+    } finally {
+      setOpening(false);
+    }
+  }
 
   /**
    * Valida y registra un movimiento de caja (entrada o salida); exige un monto
@@ -77,6 +124,62 @@ export function Caja({ caja, reload, user }) {
   }
 
   return (
+    <>
+    <section className="panel">
+      <div className="panel-title">
+        <Coins size={20} />
+        <h2>Apertura de caja</h2>
+      </div>
+      {apertura ? (
+        <div className="report-summary row" style={{ flexWrap: 'wrap', gap: '1.5rem', marginBottom: '0.75rem' }}>
+          <span>Apertura registrada: <strong>{fmt(apertura.total, 'NIO')}</strong></span>
+          <span>Por: <strong>{apertura.usuario || '-'}</strong></span>
+          <span>{new Date(apertura.fecha).toLocaleString()}</span>
+        </div>
+      ) : (
+        <p className="muted small">Aun no se registra una apertura de caja para hoy.</p>
+      )}
+
+      <p className="muted small">
+        Captura cuantos billetes y monedas hay en caja al abrir. Esto define el efectivo disponible
+        para dar vuelto en el punto de venta.
+      </p>
+
+      <form onSubmit={openApertura}>
+        <div className="denom-grid">
+          {denoms.map((denom) => (
+            <label key={denom.id} className="denom-cell">
+              <span>{fmt(denom.valor, denom.moneda)} <small className="muted">({denom.tipo})</small></span>
+              <input
+                type="number"
+                min="0"
+                step="1"
+                value={counts[denom.id] ?? ''}
+                onChange={(e) => setCounts({ ...counts, [denom.id]: e.target.value })}
+                placeholder="0"
+              />
+            </label>
+          ))}
+          {denoms.length === 0 && (
+            <p className="muted small">No hay denominaciones activas. Registralas en Configuracion.</p>
+          )}
+        </div>
+
+        <div className="pos-total">
+          <span>Total apertura</span>
+          <strong>{fmt(aperturaTotal, 'NIO')}</strong>
+        </div>
+
+        {openingError && <div className="alert">{openingError}</div>}
+
+        <div className="row">
+          <button type="submit" disabled={opening || denoms.length === 0}>
+            {opening ? 'Registrando...' : 'Registrar apertura'}
+          </button>
+        </div>
+      </form>
+    </section>
+
     <section className="panel">
       <div className="panel-title">
         <Wallet size={20} />
@@ -155,5 +258,6 @@ export function Caja({ caja, reload, user }) {
         </table>
       </div>
     </section>
+    </>
   );
 }

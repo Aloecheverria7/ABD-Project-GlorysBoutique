@@ -2,7 +2,7 @@
 import { Op } from 'sequelize';
 import { Router } from 'express';
 import { sequelize } from '../db.js';
-import { Abono, Cliente, TipoPago, Usuario, Venta } from '../models/index.js';
+import { Abono, Cliente, DetalleVenta, Deuda, Producto, ProductoVariante, TipoPago, Usuario } from '../models/index.js';
 import { requireAuth } from '../auth/middleware.js';
 import { asyncHandler, sendCreated } from '../utils/http.js';
 
@@ -64,33 +64,18 @@ async function computeBalances(clienteId) {
     }, {});
   };
 
-  /**
-   * Suma la columna 'total' del modelo Venta agrupando por moneda.
-   *
-   * @param {object} where - Condiciones de filtrado para la consulta de ventas.
-   * @returns {Promise<Object<string, number>>} Mapa de moneda a total acumulado de ventas.
-   */
-  const sumVentasByMoneda = async (where) => {
-    const rows = await Venta.findAll({
-      attributes: ['moneda', [sequelize.fn('SUM', sequelize.col('total')), 'total']],
-      where,
-      group: ['moneda'],
-      raw: true
-    });
-    return rows.reduce((acc, row) => {
-      acc[row.moneda || 'NIO'] = Number(row.total || 0);
-      return acc;
-    }, {});
-  };
-
-  // Regla de negocio: solo las ventas pagadas con un tipo de pago marcado como credito
-  // (es_credito = true) generan deuda. Las ventas de contado (efectivo, tarjeta, etc.) no cuentan.
-  const creditTypes = await TipoPago.findAll({ where: { es_credito: true }, attributes: ['id'] });
-  const creditIds = creditTypes.map((t) => t.id);
-
-  const credit = creditIds.length > 0
-    ? await sumVentasByMoneda({ cliente_id: clienteId, tipo_pago_id: { [Op.in]: creditIds } })
-    : {};
+  // Regla de negocio: la deuda proviene del registro explicito de deudas (una por venta a credito),
+  // que guarda el monto_total financiado. El enganche y los pagos posteriores se asientan como abonos.
+  const debtRows = await Deuda.findAll({
+    attributes: ['moneda', [sequelize.fn('SUM', sequelize.col('monto_total')), 'total']],
+    where: { cliente_id: clienteId },
+    group: ['moneda'],
+    raw: true
+  });
+  const credit = debtRows.reduce((acc, row) => {
+    acc[row.moneda || 'NIO'] = Number(row.total || 0);
+    return acc;
+  }, {});
   const paid = await sumByMoneda(Abono, { cliente_id: clienteId });
 
   // Regla de negocio: el saldo pendiente = total vendido a credito - total abonado, calculado
@@ -119,10 +104,46 @@ async function computeBalances(clienteId) {
 paymentsRouter.get('/', asyncHandler(async (req, res) => {
   const where = {};
   if (req.query.cliente_id) where.cliente_id = Number(req.query.cliente_id);
+
+  // Filtro por producto: deja solo los abonos cuyas deudas provienen de ventas que incluyen un
+  // producto cuyo nombre coincide. Se resuelve por pasos (producto -> variante -> detalle -> venta ->
+  // deuda) para evitar joins profundos y fragiles.
+  const productoQuery = String(req.query.producto || '').trim();
+  if (productoQuery) {
+    const productos = await Producto.findAll({
+      where: { nombre: { [Op.like]: `%${productoQuery}%` } },
+      attributes: ['id']
+    });
+    const productoIds = productos.map((p) => p.id);
+    const variantes = productoIds.length
+      ? await ProductoVariante.findAll({ where: { producto_id: productoIds }, attributes: ['id'] })
+      : [];
+    const varianteIds = variantes.map((v) => v.id);
+    const detalles = varianteIds.length
+      ? await DetalleVenta.findAll({ where: { producto_variante_id: varianteIds }, attributes: ['venta_id'] })
+      : [];
+    const ventaIds = [...new Set(detalles.map((d) => d.venta_id))];
+    const deudas = ventaIds.length
+      ? await Deuda.findAll({ where: { venta_id: ventaIds }, attributes: ['id'] })
+      : [];
+    const deudaIds = deudas.map((d) => d.id);
+    if (deudaIds.length === 0) {
+      res.json([]);
+      return;
+    }
+    where.deuda_id = deudaIds;
+  }
+
+  // Filtro de texto por cliente (nombre o cedula). Cuando esta presente, fuerza el join (required).
+  const q = String(req.query.q || '').trim();
+  const clienteWhere = q
+    ? { [Op.or]: [{ nombre: { [Op.like]: `%${q}%` } }, { cedula: { [Op.like]: `%${q}%` } }] }
+    : undefined;
+
   const abonos = await Abono.findAll({
     where,
     include: [
-      { model: Cliente, as: 'clienteInfo', attributes: ['nombre'] },
+      { model: Cliente, as: 'clienteInfo', attributes: ['nombre', 'cedula'], where: clienteWhere, required: !!clienteWhere },
       { model: TipoPago, as: 'tipoPagoInfo', attributes: ['nombre'] },
       { model: Usuario, as: 'usuarioInfo', attributes: ['username'] }
     ],

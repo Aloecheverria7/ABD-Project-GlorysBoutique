@@ -2,9 +2,10 @@
  * @file Vista de proveedores. Permite crear, editar y eliminar proveedores y
  * vincular los productos que entregan, con costo y moneda opcionales por producto.
  */
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Plus, Trash2, Truck, Pencil, X } from 'lucide-react';
 import { Field } from '../components/Field.jsx';
+import { Modal } from '../components/Modal.jsx';
 import { api } from '../api.js';
 import { fmt } from '../utils/format.js';
 
@@ -26,6 +27,40 @@ export function Suppliers({ suppliers, products, reload }) {
   const [productLinks, setProductLinks] = useState([]);
   const [editingId, setEditingId] = useState(null);
   const [error, setError] = useState('');
+  const [modalOpen, setModalOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const [searchProducto, setSearchProducto] = useState('');
+  const [filterSubcat, setFilterSubcat] = useState('');
+
+  const productsById = useMemo(() => new Map(products.map((p) => [p.id, p])), [products]);
+
+  // Opciones de subcategoria derivadas del catalogo de productos.
+  const subcatOptions = useMemo(() => {
+    const map = new Map();
+    products.forEach((p) => {
+      if (p.subcategoria_id != null && !map.has(p.subcategoria_id)) {
+        map.set(p.subcategoria_id, p.subcategoria || `#${p.subcategoria_id}`);
+      }
+    });
+    return [...map.entries()].map(([id, nombre]) => ({ id, nombre }));
+  }, [products]);
+
+  const filteredSuppliers = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    const qp = searchProducto.trim().toLowerCase();
+    return suppliers.filter((s) => {
+      if (q && !`${s.nombre || ''}`.toLowerCase().includes(q)) return false;
+      if (qp && !(s.productos || []).some((p) => `${p.nombre || ''}`.toLowerCase().includes(qp))) return false;
+      if (filterSubcat) {
+        const ok = (s.productos || []).some((p) => {
+          const full = productsById.get(p.id);
+          return full && String(full.subcategoria_id) === filterSubcat;
+        });
+        if (!ok) return false;
+      }
+      return true;
+    });
+  }, [suppliers, search, searchProducto, filterSubcat, productsById]);
 
   /**
    * Carga en el formulario los datos del proveedor seleccionado para editarlo,
@@ -34,8 +69,17 @@ export function Suppliers({ suppliers, products, reload }) {
    * @param {Object} supplier - Proveedor a editar.
    * @returns {void}
    */
+  function openCreate() {
+    setEditingId(null);
+    setForm(emptyForm);
+    setProductLinks([]);
+    setError('');
+    setModalOpen(true);
+  }
+
   function startEdit(supplier) {
     setEditingId(supplier.id);
+    setModalOpen(true);
     setForm({
       nombre: supplier.nombre || '',
       telefono: supplier.telefono || '',
@@ -59,6 +103,7 @@ export function Suppliers({ suppliers, products, reload }) {
     setForm(emptyForm);
     setProductLinks([]);
     setError('');
+    setModalOpen(false);
   }
 
   /**
@@ -151,10 +196,26 @@ export function Suppliers({ suppliers, products, reload }) {
       </div>
       <p className="muted small">Registra proveedores y los productos que entregan, con costo opcional por proveedor.</p>
 
-      <form className="grid-form" onSubmit={submit}>
-        <Field label="Nombre">
-          <input required value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} />
-        </Field>
+      <div className="toolbar">
+        <button type="button" onClick={openCreate}>
+          <Plus size={14} />
+          <span>Agregar proveedor</span>
+        </button>
+        <span className="spacer" />
+        <input placeholder="Buscar proveedor..." value={search} onChange={(e) => setSearch(e.target.value)} />
+        <input placeholder="Producto que suministra..." value={searchProducto} onChange={(e) => setSearchProducto(e.target.value)} />
+        <select value={filterSubcat} onChange={(e) => setFilterSubcat(e.target.value)}>
+          <option value="">Toda subcategoria</option>
+          {subcatOptions.map((s) => <option key={s.id} value={s.id}>{s.nombre}</option>)}
+        </select>
+      </div>
+
+      {modalOpen && (
+        <Modal title={editingId ? 'Editar proveedor' : 'Agregar proveedor'} onClose={cancelEdit}>
+          <form className="grid-form" onSubmit={submit}>
+            <Field label="Nombre">
+              <input required value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} />
+            </Field>
         <Field label="Telefono">
           <input value={form.telefono} onChange={(e) => setForm({ ...form, telefono: e.target.value })} />
         </Field>
@@ -207,14 +268,14 @@ export function Suppliers({ suppliers, products, reload }) {
         {error && <div className="alert">{error}</div>}
         <div className="row">
           <button type="submit">{editingId ? 'Actualizar proveedor' : 'Guardar proveedor'}</button>
-          {editingId && (
-            <button type="button" className="ghost" onClick={cancelEdit}>
-              <X size={14} />
-              <span>Cancelar</span>
-            </button>
-          )}
+          <button type="button" className="ghost" onClick={cancelEdit}>
+            <X size={14} />
+            <span>Cancelar</span>
+          </button>
         </div>
-      </form>
+          </form>
+        </Modal>
+      )}
 
       <div className="table-wrap">
         <table>
@@ -227,7 +288,7 @@ export function Suppliers({ suppliers, products, reload }) {
             </tr>
           </thead>
           <tbody>
-            {suppliers.map((supplier) => (
+            {filteredSuppliers.map((supplier) => (
               <tr key={supplier.id}>
                 <td>
                   <strong>{supplier.nombre}</strong>
@@ -257,7 +318,7 @@ export function Suppliers({ suppliers, products, reload }) {
                 </td>
               </tr>
             ))}
-            {suppliers.length === 0 && <tr><td colSpan="4">Aun no hay proveedores registrados.</td></tr>}
+            {filteredSuppliers.length === 0 && <tr><td colSpan="4">No hay proveedores que coincidan.</td></tr>}
           </tbody>
         </table>
       </div>

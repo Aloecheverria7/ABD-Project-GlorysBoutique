@@ -13,9 +13,10 @@ import { DEFAULT_RATE } from '../constants.js';
  * @param {Object} props
  * @param {{ inventory: Array<Object>, sales: Array<Object>, products: Array<Object>, customers: Array<Object> }} props.data - Datos agregados del sistema usados para calcular las metricas y listar ventas.
  * @param {{ username: string, rol: string }} props.user - Usuario en sesion; su rol determina que metricas se muestran.
+ * @param {(viewId: string) => void} props.onNavigate - Navega al modulo indicado al hacer clic en una tarjeta.
  * @returns {JSX.Element}
  */
-export function Dashboard({ data, user }) {
+export function Dashboard({ data, user, onNavigate }) {
   const lowStock = data.inventory.filter((item) => item.cantidad <= 5).length;
   const revenueNIO = data.sales.reduce((sum, sale) => {
     const total = Number(sale.total);
@@ -28,10 +29,14 @@ export function Dashboard({ data, user }) {
   return (
     <>
       <section className="stats-grid">
-        {isAdmin && <Stat icon={ShoppingBag} label="Productos" value={data.products.length} />}
-        <Stat icon={Users} label="Clientes" value={data.customers.length} />
-        {isAdmin && <Stat icon={Boxes} label="Stock bajo" value={lowStock} />}
-        <Stat icon={CreditCard} label="Ventas (NIO)" value={fmt(revenueNIO, 'NIO')} />
+        {isAdmin && (
+          <Stat icon={ShoppingBag} label="Productos" value={data.products.length} onClick={() => onNavigate('products')} />
+        )}
+        <Stat icon={Users} label="Clientes" value={data.customers.length} onClick={() => onNavigate('customers')} />
+        {isAdmin && (
+          <Stat icon={Boxes} label="Stock bajo" value={lowStock} onClick={() => onNavigate('inventory')} />
+        )}
+        <Stat icon={CreditCard} label="Ventas (NIO)" value={fmt(revenueNIO, 'NIO')} onClick={() => onNavigate('sales')} />
       </section>
 
       <section className="panel">

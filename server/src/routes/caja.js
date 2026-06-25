@@ -1,12 +1,48 @@
-/** @file Rutas de caja: consulta de saldo y registro/borrado de movimientos de entrada y salida de efectivo. */
+/** @file Rutas de caja: saldo, movimientos de efectivo y apertura de caja con desglose por denominacion. */
 import { Router } from 'express';
-import { CajaMovimiento, Configuracion, Usuario } from '../models/index.js';
+import { sequelize } from '../db.js';
+import { CajaApertura, CajaAperturaDetalle, CajaMovimiento, Configuracion, Denominacion, Usuario } from '../models/index.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { asyncHandler, sendCreated } from '../utils/http.js';
 
 export const cajaRouter = Router();
 
 cajaRouter.use(requireAuth);
+
+/**
+ * Obtiene la apertura de caja abierta mas reciente con su desglose por denominacion, o null si no hay.
+ *
+ * @returns {Promise<{ id: number, total: number, fecha: Date, usuario: (string|null), detalles: Array<{ denominacion_id: number, valor: number, tipo: string, moneda: string, cantidad: number }> }|null>} Apertura actual o null.
+ */
+async function getAperturaActual() {
+  const apertura = await CajaApertura.findOne({
+    where: { estado: 'abierta' },
+    include: [
+      { model: Usuario, as: 'usuarioInfo', attributes: ['username'] },
+      {
+        model: CajaAperturaDetalle,
+        as: 'detalles',
+        include: [{ model: Denominacion, as: 'denominacionInfo', attributes: ['valor', 'tipo', 'moneda'] }]
+      }
+    ],
+    order: [['fecha', 'DESC'], ['id', 'DESC']]
+  });
+  if (!apertura) return null;
+  const data = apertura.get({ plain: true });
+  return {
+    id: data.id,
+    total: Number(data.total || 0),
+    fecha: data.fecha,
+    usuario: data.usuarioInfo?.username || null,
+    detalles: (data.detalles || []).map((d) => ({
+      denominacion_id: d.denominacion_id,
+      valor: d.denominacionInfo ? Number(d.denominacionInfo.valor) : null,
+      tipo: d.denominacionInfo?.tipo || null,
+      moneda: d.denominacionInfo?.moneda || 'NIO',
+      cantidad: d.cantidad
+    }))
+  };
+}
 
 /**
  * Convierte una instancia de CajaMovimiento a un objeto plano para la respuesta JSON,
@@ -50,12 +86,13 @@ async function getBase() {
  * @returns {Promise<void>}
  */
 cajaRouter.get('/', asyncHandler(async (_req, res) => {
-  const [base, movimientos] = await Promise.all([
+  const [base, movimientos, apertura] = await Promise.all([
     getBase(),
     CajaMovimiento.findAll({
       include: [{ model: Usuario, as: 'usuarioInfo', attributes: ['username'] }],
       order: [['fecha', 'DESC'], ['id', 'DESC']]
-    })
+    }),
+    getAperturaActual()
   ]);
 
   const saldo = movimientos.reduce((sum, mov) => {
@@ -66,8 +103,58 @@ cajaRouter.get('/', asyncHandler(async (_req, res) => {
   res.json({
     base,
     saldo: Number(saldo.toFixed(2)),
-    movimientos: movimientos.map(formatMovimiento)
+    movimientos: movimientos.map(formatMovimiento),
+    apertura
   });
+}));
+
+/**
+ * POST /api/caja/apertura - Abre una caja registrando el conteo de billetes y monedas disponibles.
+ * Cierra cualquier apertura previa que siguiera abierta, calcula el total a partir de las
+ * denominaciones por su valor y guarda el desglose. Todo en una transaccion.
+ *
+ * @param {import('express').Request} req - req.user.id (usuario) y req.body con { detalles: [{ denominacion_id, cantidad }] }.
+ * @param {import('express').Response} res - Responde 201 con la apertura registrada o 400 si no hay un desglose valido.
+ * @returns {Promise<void>}
+ */
+cajaRouter.post('/apertura', asyncHandler(async (req, res) => {
+  const detalles = Array.isArray(req.body?.detalles) ? req.body.detalles : [];
+  const limpios = detalles
+    .map((d) => ({ denominacion_id: Number(d.denominacion_id), cantidad: Math.max(0, Math.trunc(Number(d.cantidad) || 0)) }))
+    .filter((d) => d.denominacion_id && d.cantidad > 0);
+
+  if (limpios.length === 0) {
+    res.status(400).json({ message: 'Registra al menos una denominacion con cantidad.' });
+    return;
+  }
+
+  // Las denominaciones deben existir; el total se calcula en el servidor a partir de su valor real.
+  const ids = limpios.map((d) => d.denominacion_id);
+  const denominaciones = await Denominacion.findAll({ where: { id: ids } });
+  const valorPorId = new Map(denominaciones.map((d) => [d.id, Number(d.valor)]));
+  if (denominaciones.length !== new Set(ids).size) {
+    res.status(400).json({ message: 'Alguna denominacion no existe.' });
+    return;
+  }
+
+  const total = limpios.reduce((sum, d) => sum + (valorPorId.get(d.denominacion_id) || 0) * d.cantidad, 0);
+
+  await sequelize.transaction(async (transaction) => {
+    // Solo puede haber una apertura abierta a la vez: se cierran las anteriores.
+    await CajaApertura.update({ estado: 'cerrada' }, { where: { estado: 'abierta' }, transaction });
+    const apertura = await CajaApertura.create({
+      usuario_id: req.user.id,
+      total: Number(total.toFixed(2)),
+      estado: 'abierta'
+    }, { transaction });
+    await CajaAperturaDetalle.bulkCreate(limpios.map((d) => ({
+      apertura_id: apertura.id,
+      denominacion_id: d.denominacion_id,
+      cantidad: d.cantidad
+    })), { transaction });
+  });
+
+  sendCreated(res, await getAperturaActual());
 }));
 
 /**

@@ -1,7 +1,7 @@
 /** @file Rutas de compras a proveedores: registro de compras con sus detalles y aumento de inventario. */
 import { Router } from 'express';
 import { sequelize } from '../db.js';
-import { Compra, Configuracion, DetalleCompra, Inventario, Producto, ProductoVariante, Proveedor, Usuario } from '../models/index.js';
+import { Compra, Configuracion, DetalleCompra, Inventario, KardexMovimiento, Producto, ProductoVariante, Proveedor, Usuario } from '../models/index.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { asyncHandler, sendCreated } from '../utils/http.js';
 
@@ -188,6 +188,18 @@ purchasesRouter.post('/', adminOnly, asyncHandler(async (req, res) => {
       });
       await inventory.update({
         cantidad: Number(inventory.cantidad) + Number(item.cantidad)
+      }, { transaction });
+
+      // Cada renglon de compra es un ingreso de inventario: queda asentado en el Kardex.
+      await KardexMovimiento.create({
+        producto_variante_id: Number(item.producto_variante_id),
+        tipo: 'ingreso',
+        cantidad: Number(item.cantidad),
+        motivo: 'Compra a proveedor',
+        costo_unitario: Number(item.costo_unitario),
+        referencia_tipo: 'compra',
+        referencia_id: createdPurchase.id,
+        usuario_id
       }, { transaction });
     }
 

@@ -49,9 +49,13 @@ Main endpoints:
 - `GET|POST|PUT|DELETE /api/products`
 - `GET /api/products/variants`
 - `POST /api/products/:id/variants`
-- `GET|PUT /api/inventory`
-- `GET|POST /api/sales`
-- `GET /api/caja` y `POST|DELETE /api/caja/movimientos`
+- `GET|PUT /api/inventory`, `GET /api/inventory/kardex`, `POST /api/inventory/movimientos`
+- `GET|POST /api/sales` (soporta `tipo_venta`, pagos mixtos en `pagos`, y plan de credito con `cuotas`/`enganche`)
+- `GET /api/credit` (clientes con credito activo y su plan de cuotas)
+- `GET|POST /api/payments` (abonos; busqueda por `?q=` cliente y `?producto=`)
+- `GET|POST /api/losses` (modulo de perdidas)
+- `GET|POST|PUT|DELETE /api/config/denominaciones` (billetes y monedas)
+- `GET /api/caja`, `POST|DELETE /api/caja/movimientos`, `POST /api/caja/apertura`
 
 Cuentas iniciales (contrasena `123`): `admin1`, `admin2`, `admin3` y `dueno` (admin); `empleado` (vendedor).
 

@@ -3,21 +3,33 @@ import React from 'react';
 
 /**
  * Tarjeta de estadistica que muestra un icono junto a una etiqueta y su valor.
+ * Si se le pasa onClick, se renderiza como un boton clickeable que navega a su modulo.
  *
  * @param {Object} props
  * @param {React.ComponentType<{size?: number}>} props.icon - Componente de icono a renderizar.
  * @param {string} props.label - Texto descriptivo de la metrica.
  * @param {string|number} props.value - Valor de la metrica a mostrar.
+ * @param {Function} [props.onClick] - Si se provee, hace la tarjeta clickeable (acceso directo).
  * @returns {JSX.Element}
  */
-export function Stat({ icon: Icon, label, value }) {
-  return (
-    <section className="stat">
+export function Stat({ icon: Icon, label, value, onClick }) {
+  const content = (
+    <>
       <Icon size={20} />
       <div>
         <span>{label}</span>
         <strong>{value}</strong>
       </div>
-    </section>
+    </>
   );
+
+  if (typeof onClick === 'function') {
+    return (
+      <button type="button" className="stat stat--clickable" onClick={onClick}>
+        {content}
+      </button>
+    );
+  }
+
+  return <section className="stat">{content}</section>;
 }
